@@ -65,7 +65,12 @@ jobs:
             if (p.private) { console.error('package.json 仍为 private:true，无法发布'); process.exit(1); }
             if (!p.version) { console.error('缺少 version'); process.exit(1); }
             if (p.name !== 'dsh-event-notice') { console.error('包名应为 dsh-event-notice，实际为', p.name); process.exit(1); }
-            console.log('包名:', p.name, '版本:', p.version);"
+            if (p.license !== 'MIT') { console.error('license 应为 MIT，实际为', p.license); process.exit(1); }
+            console.log('包名:', p.name, '版本:', p.version, '协议:', p.license);"
+          if [ ! -f LICENSE ]; then
+            echo "::error::仓库根目录缺少 LICENSE 文件"
+            exit 1
+          fi
 
       - name: 生成 tarball
         id: pack

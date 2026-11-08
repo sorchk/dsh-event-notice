@@ -2,6 +2,17 @@
 
 本项目遵循语义化版本。
 
+## 0.5.2
+
+### 新增
+
+- **补充 MIT 许可证文件**：仓库根目录新增 [`LICENSE`](./LICENSE)（MIT License，Copyright (c) 2026 sorchk），
+  此前 `package.json` 里虽然声明了 `"license": "MIT"`，但仓库没有对应的协议正文。
+  `package.json` 的 `files` 字段加入 `LICENSE`，`LICENSE` 会随 npm 包一同分发。
+- `package.json` 补充 `author` 字段（`sorchk`）。
+- README 末尾的「许可」章节改写为「许可证」，列出协议摘要并指向 `LICENSE` 文件。
+- 版本号升到 `0.5.2`，README 中的安装命令与 tarball 示例一并更新。
+
 ## 0.5.1
 
 ### 修复

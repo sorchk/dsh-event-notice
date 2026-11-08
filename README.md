@@ -24,7 +24,7 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 ```bash
 # 从 npm 安装（发布后可用，支持指定版本）
 plugin_manager install_bundle dsh-event-notice
-plugin_manager install_bundle dsh-event-notice@0.5.1
+plugin_manager install_bundle dsh-event-notice@0.5.2
 
 # 在 DSH 里安装本地 bundle
 plugin_manager install_bundle target=/绝对路径/dsh-event-notice
@@ -259,13 +259,21 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.1.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.2.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。
 
 发布后即可通过 `plugin_manager install_bundle dsh-event-notice` 安装。
 
-## 许可
+## 许可证
 
-MIT
+本项目采用 [MIT 许可证](./LICENSE)，版权所有者：sorchk。
+
+```text
+MIT License
+
+Copyright (c) 2026 sorchk
+```
+
+完整协议文本见仓库根目录的 [`LICENSE`](./LICENSE) 文件（随 npm 包一同分发）。
