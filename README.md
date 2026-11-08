@@ -22,6 +22,10 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 插件是一个 Cordis bundle，同时包含宿主端（`index.js`）与浏览器端（`client.js`）。
 
 ```bash
+# 从 npm 安装（发布后可用，支持指定版本）
+plugin_manager install_bundle dsh-event-notice
+plugin_manager install_bundle dsh-event-notice@0.5.0
+
 # 在 DSH 里安装本地 bundle
 plugin_manager install_bundle target=/绝对路径/dsh-event-notice
 ```
@@ -208,6 +212,59 @@ client.js       浏览器端：配置页
 locale/         en / zh 文案
 test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主端接线）
 ```
+
+## GitHub Actions
+
+仓库内置两个工作流：
+
+| 工作流 | 触发方式 | 做什么 |
+| --- | --- | --- |
+| [.github/workflows/ci.yml](./.github/workflows/ci.yml) | 每次 push、每个 PR | 语法检查 + 单元测试（`npm ci` → `node --check` → `npm test`） |
+| [.github/workflows/publish.yml](./.github/workflows/publish.yml) | 仅手动触发 | 打包（产出 tarball artifact），勾选 `publish` 时才真正发布到 npm |
+
+## 发布到 npm（GitHub Actions 手动触发）
+
+发布工作流**只在 GitHub Actions 页面点击「Run workflow」时执行**，没有任何自动触发器
+（不打 tag、不随 push 构建、不定时发布）。
+
+### 前置配置（一次性）
+
+1. 在 npm 上确认包名 `dsh-event-notice` 可用（未被占用）。
+2. 在仓库 **Settings → Secrets and variables → Actions** 新建 secret：
+
+   | Secret | 值 | 用途 |
+   | --- | --- | --- |
+   | `NPM_TOKEN` | npm 的 Automation Token（Classic Token 勾选 publish） | 发布权限 |
+
+3. npm 账号需要开通 **Two-factor authentication**（npm 现在强制要求）。
+
+### 执行方式
+
+在 GitHub 仓库页 → **Actions** → 左侧选择「打包并发布到 npm」→ 右侧 **Run workflow**，
+勾选输入项：
+
+| 输入项 | 默认 | 说明 |
+| --- | --- | --- |
+| `publish` | `false` | 是否真正发布到 npm；`false` 时只打包并产出 `dsh-event-notice-<version>.tgz` 供下载 |
+| `dry_run` | `false` | 发布演练：`npm publish --dry-run`，不真正上传（需同时勾选 `publish`）；演练模式不会回查 npm 上的版本，因为演练不会真的发布 |
+| `provenance` | `false` | 启用 npm provenance 签名（需仓库为公开仓库，且工作流已申请 `id-token: write`） |
+
+### 工作流做了什么
+
+| 阶段 | 步骤 |
+| --- | --- |
+| 打包 | 检出代码 → Node.js 20 → `npm ci` → `node --check` 语法检查 → `npm test` 单元测试 → 校验 `package.json`（无 `private`、有 `version`、包名为 `dsh-event-notice`）→ `npm pack` → 上传 tarball artifact |
+| 发布 | 仅当 `publish = true`：校验 `NPM_TOKEN` 存在 → 下载 tarball → 检查该版本是否已发布（已发布则报错退出）→ `npm publish --access public` → 回查 npm 上的版本与 tarball 地址（最多重试 20 次 × 15 秒；`dry_run` 模式跳过回查） |
+
+> 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
+> 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
+
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.0.tgz`）。
+> npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
+> 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
+> `Permission denied (publickey)`、`npm error code 128`。
+
+发布后即可通过 `plugin_manager install_bundle dsh-event-notice` 安装。
 
 ## 许可
 

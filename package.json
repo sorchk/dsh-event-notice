@@ -1,7 +1,6 @@
 {
   "name": "dsh-event-notice",
-  "version": "1.4.0",
-  "private": true,
+  "version": "0.5.0",
   "type": "module",
   "description": "DSH 事件通知插件：任务完成、任务中断、需要审批、需要回答问题时，通过 Gotify、Webhook 或 ntfy 发送通知。",
   "exports": {
@@ -14,6 +13,7 @@
     "index.js",
     "client.js",
     "lib/",
+    "test/",
     "locale/*.json",
     "icon.svg",
     "cordis.patch.yml",
@@ -22,6 +22,17 @@
   ],
   "scripts": {
     "test": "node --test \"test/*.test.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sorchk/dsh-event-notice.git"
+  },
+  "homepage": "https://github.com/sorchk/dsh-event-notice#readme",
+  "bugs": {
+    "url": "https://github.com/sorchk/dsh-event-notice/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=20"
