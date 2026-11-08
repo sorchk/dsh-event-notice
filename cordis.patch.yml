@@ -1,0 +1,5 @@
+# dsh-event-notice 插件行：把插件挂进 profile。
+# id 是配置命名空间（设置页据此读写本插件的配置），name 是解析用的包名。
+- insert:
+    - id: dsh-event-notice
+      name: 'dsh-event-notice'
