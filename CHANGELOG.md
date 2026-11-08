@@ -2,6 +2,16 @@
 
 本项目遵循语义化版本。
 
+## 0.5.1
+
+### 修复
+
+- **修复 GitHub Actions 的单元测试步骤报错**：原测试脚本写作 `node --test "test/*.test.js"`，但 Node.js 的 `--test`
+  参数**从 Node 21 起才支持 glob 模式**，在 CI 使用的 Node 20 上引号里的 `test/*.test.js` 会被当成字面路径，
+  导致 `Could not find '.../test/*.test.js'`、job 以退出码 1 失败（本地 Node 24 因支持 glob 所以一直能过）。
+  测试脚本改为 `node --test`，由 Node 自行发现 `test/` 下的 `*.test.js` 文件，Node 18/20/22/24 均可正常运行。
+- **同步版本号到 `0.5.1`**，README 中的安装命令与 tarball 示例一并更新。
+
 ## 0.5.0
 
 ### 新增
