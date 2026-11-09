@@ -21,11 +21,55 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 
 插件是一个 Cordis bundle，同时包含宿主端（`index.js`）与浏览器端（`client.js`）。
 
+### 从 GitHub 仓库安装
+
+不想等 npm 发布，或者想直接用主分支的最新改动时，用 `dsh plugin` 命令装。
+这条命令把参数原样转给 pnpm，实际是在 `~/.dsh/profiles/<profile>/` 里执行 `pnpm add`：
+
+```bash
+# 默认分支（main）的最新提交
+dsh plugin --profile web add github:sorchk/dsh-event-notice
+
+# 固定到某个 tag
+dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.3
+
+# 固定到某个 commit
+dsh plugin --profile web add github:sorchk/dsh-event-notice#c30f562
+```
+
+| 事项 | 说明 |
+| --- | --- |
+| `--profile web` | 装到哪个 profile。`web` 是网页版，其它取值见 `dsh --help`（如 `tui`、`headless`）；各 profile 的插件互不相通 |
+| 安装位置 | `~/.dsh/profiles/<profile>/`，装完后插件会写进该 profile 的 `package.json` 依赖里 |
+| 自动启用 | 安装成功后 DSH 会自动把插件追加到同一份 `package.json` 的 `dsh.profile.bundles` 列表，不用手动加 |
+| 生效时机 | 需要**重启**该 profile 的 DSH 进程（网页界面）才会加载新插件 |
+| 依赖 | `@deepseek-ai/schemastery` 由 pnpm 一并装进 profile 的 `node_modules/`，宿主端可以直接解析到 |
+| 卸载 | `dsh plugin --profile web remove dsh-event-notice` |
+| 更新 | `dsh plugin --profile web update dsh-event-notice` |
+
+`owner/repo`、`owner/repo#tag`、`owner/repo#commit` 是 pnpm 的 GitHub 简写，`dsh plugin` 原样透传；
+也接受完整地址：
+
+```bash
+dsh plugin --profile web add https://github.com/sorchk/dsh-event-notice.git
+dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.git
+```
+
+> **构建脚本**：pnpm 默认不执行依赖的构建脚本。本插件自身没有构建脚本，正常不会触发拦截；
+> 如果 pnpm 提示构建被阻止，按提示在 `~/.dsh/profiles/<profile>/pnpm-workspace.yaml` 的
+> `allowBuilds` 下加上对应的键（例如 `dsh-event-notice: true`），然后重跑同一条命令。
+
+### 从 npm 安装
+
 ```bash
 # 从 npm 安装（发布后可用，支持指定版本）
 plugin_manager install_bundle dsh-event-notice
-plugin_manager install_bundle dsh-event-notice@0.5.3
+plugin_manager install_bundle dsh-event-notice@0.5.4
+```
 
+### 从本地目录安装
+
+```bash
 # 在 DSH 里安装本地 bundle
 plugin_manager install_bundle target=/绝对路径/dsh-event-notice
 ```
@@ -37,7 +81,7 @@ plugin_manager install_bundle target=/绝对路径/dsh-event-notice
 - 浏览器端还会在 **设置弹窗左侧导航**（排在「侧边卡片」之后）加一个「事件通知」入口，点开就是同一张配置页；这个入口可以用配置页里的「在设置页显示」关掉，关掉后导航里就没有这一项了；
 - 浏览器端会在 **会话输入框**（模型选择器左边）加一个铃铛按钮，用来单独开关当前会话的通知。
 
-插件自带的 `node_modules/@deepseek-ai/schemastery` 会被一起链接，宿主的 ESM 解析器因此可以正常找到依赖。
+本地链接安装时，插件自带的 `node_modules/@deepseek-ai/schemastery` 会被一起链接；从 GitHub 或 npm 安装时，该依赖由包管理器装进 profile 的 `node_modules/`。无论哪种方式，宿主的 ESM 解析器都能正常找到依赖。
 
 ## 配置页
 
@@ -263,12 +307,13 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.3.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.4.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。
 
-发布后即可通过 `plugin_manager install_bundle dsh-event-notice` 安装。
+发布后即可通过 `plugin_manager install_bundle dsh-event-notice` 安装；
+不等发布的话，直接从 GitHub 仓库装：`dsh plugin --profile web add github:sorchk/dsh-event-notice`。
 
 ## 许可证
 

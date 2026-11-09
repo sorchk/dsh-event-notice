@@ -2,6 +2,21 @@
 
 本项目遵循语义化版本。
 
+## 0.5.4
+
+### 新增
+
+- **README 的「安装」章节补充「从 GitHub 仓库安装」说明**：新增
+  `dsh plugin --profile web add github:sorchk/dsh-event-notice` 的用法，并补充
+  固定 tag（`github:sorchk/dsh-event-notice#v0.5.3`）与固定 commit
+  （`github:sorchk/dsh-event-notice#c30f562`）的写法、完整 Git 地址写法，
+  以及 profile 选择、安装位置、自动写入 `dsh.profile.bundles`、需要重启才生效、
+  依赖 `schemastery` 的安装位置、卸载与更新命令、pnpm 构建脚本被拦截时在
+  `pnpm-workspace.yaml` 的 `allowBuilds` 里放行的处理办法。
+- 原有的 npm 安装与本地目录安装拆成「从 npm 安装」「从本地目录安装」两个小节，
+  与新增的 GitHub 安装方式并列。
+- 版本号升到 `0.5.4`，README 中的安装命令与 tarball 示例一并更新。
+
 ## 0.5.3
 
 ### 修复
