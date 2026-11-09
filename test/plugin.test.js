@@ -146,3 +146,69 @@ test('没填服务器信息的通道被跳过，不算失败', async (t) => {
   assert.equal(host.calls.length, 1)
   assert.equal(host.calls[0].url, 'https://ntfy.example.com')
 })
+
+/**
+ * 一个主会话与它的子代理会话。
+ * @returns {{main: object, child: object}} 两个会话替身。
+ */
+function sessionPair() {
+  return {
+    main: { id: 'session-main', header: { cwd: '/home/sorc/workspace/employment' } },
+    child: {
+      id: 'session-child',
+      header: {
+        cwd: '/home/sorc/workspace/employment',
+        origin: 'subagent',
+        parentSession: 'session-main',
+      },
+    },
+  }
+}
+
+test('子代理的通知用子代理标签与主会话标题，不显示提示词截出来的标题', async (t) => {
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true })
+  t.after(() => host.restore())
+  const { main, child } = sessionPair()
+
+  await host.emit(main, {
+    type: 'session/title',
+    data: { title: '就业管理实现冲突分析', source: { kind: 'provider' } },
+  })
+  await host.emit(child, {
+    type: 'subagent/descriptor',
+    data: { mode: 'continuable', label: '分析M01就业网站模块冲突' },
+  })
+  // 子代理自己的会话标题是从提示词里截出来的兜底标题，不能拿来做通知标题。
+  await host.emit(child, {
+    type: 'session/title',
+    data: { title: '你是只读分析员，禁止修改任', source: { kind: 'fallback' } },
+  })
+  await host.emit(child, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
+  assert.match(body.message, /主会话：就业管理实现冲突分析/)
+  assert.doesNotMatch(body.message, /你是只读分析员/)
+})
+
+test('主会话只有兜底标题时不写「主会话」这一行', async (t) => {
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true })
+  t.after(() => host.restore())
+  const { main, child } = sessionPair()
+
+  await host.emit(main, {
+    type: 'session/title',
+    data: { title: '你是只读分析员，禁止修改任', source: { kind: 'fallback' } },
+  })
+  await host.emit(child, {
+    type: 'subagent/descriptor',
+    data: { mode: 'continuable', label: '分析M01就业网站模块冲突' },
+  })
+  await host.emit(child, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
+  assert.doesNotMatch(body.message, /主会话：/)
+})

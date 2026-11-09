@@ -4,7 +4,7 @@
  * 监听会话事件，在任务完成、任务中断、需要审批、需要回答问题时，
  * 把通知发到用户配置的 Gotify、通用 Webhook 或 ntfy。
  *
- * 通知内容只包含会话标题、工作目录、结束原因与事件类型，不包含会话正文。
+ * 通知内容只包含会话标题、子代理标签、工作目录、结束原因与事件类型，不包含会话正文。
  * 发送失败只写日志，不会影响会话与工具执行。
  */
 import z from '@deepseek-ai/schemastery'
@@ -112,6 +112,12 @@ export function apply(ctx, config) {
   const pluginFiber = ctx.fiber
   /** 会话标题：事件流里的 session/title 只在标题生成时出现一次。 */
   const titles = new Map()
+  /** 正式标题：来源是标题生成服务或用户改名，而不是提示词截断出来的兜底标题。 */
+  const realTitles = new Map()
+  /** 子代理标签：子会话 ID → 子代理的名字（任务管理面板上的卡片名）。 */
+  const labels = new Map()
+  /** 会话父子关系：子会话 ID → 父会话 ID；只有子代理会话才有父会话。 */
+  const parents = new Map()
 
   /** 读取一个 volatile 字段的当前值。 */
   const read = (field, fallback) => {
@@ -223,21 +229,71 @@ export function apply(ctx, config) {
     return '助手提出了问题，等待你回答'
   }
 
+  /**
+   * 记住会话的父会话：只有子代理会话的头里带 parentSession。
+   * @param {object} session 会话。
+   */
+  const rememberParent = (session) => {
+    const sessionId = session?.id ?? ''
+    const parentId = session?.header?.parentSession
+    if (sessionId !== '' && typeof parentId === 'string' && parentId !== '') {
+      parents.set(sessionId, parentId)
+    }
+  }
+
+  /**
+   * 找出会话所属的主会话标题。
+   *
+   * 沿父会话链往上走：第一个没有父会话的祖先就是主会话。子代理的会话标题
+   * 是从提示词里截出来的兜底标题，不能拿来当主会话名，所以这里只认标题
+   * 生成服务或用户改出来的正式标题。
+   * @param {string} sessionId 会话 ID。
+   * @returns {string} 主会话标题；没有正式标题时返回空串。
+   */
+  const mainTitleOf = (sessionId) => {
+    const visited = new Set()
+    let current = sessionId
+    for (;;) {
+      const parentId = parents.get(current)
+      if (parentId === undefined || visited.has(parentId)) return ''
+      visited.add(parentId)
+      current = parentId
+      if (!parents.has(current)) return realTitles.get(current) ?? ''
+    }
+  }
+
   /** 会话事件入口。 */
   const onSessionEvent = (session, event) => {
     const sessionId = session?.id ?? ''
+    rememberParent(session)
     if (event.type === 'session/title') {
       const title = event.data?.title
-      if (typeof title === 'string' && title !== '') titles.set(sessionId, title)
+      if (typeof title === 'string' && title !== '') {
+        const source = event.data?.source?.kind ?? ''
+        titles.set(sessionId, title)
+        // 兜底标题是从第一条用户消息里截出来的，等于提示词片段，不算正式标题。
+        if (source !== 'fallback') realTitles.set(sessionId, title)
+      }
+      return
+    }
+    if (event.type === 'subagent/descriptor') {
+      // 子代理的身份信息：卡片上的名字就来自这里。
+      const label = event.data?.label
+      if (typeof label === 'string' && label !== '') labels.set(sessionId, label)
       return
     }
     const kind = classifyEvent(event)
     if (kind === undefined) return
     if (!decideNotification(config, sessionId, kind)) return
+    // 子代理会话的标题是从提示词里截出来的，不能当标题用：改用子代理标签，
+    // 并补上它所属的主会话。
+    const isSubagent = session?.header?.origin === 'subagent'
     const payload = buildPayload({
       kind,
       sessionId,
-      sessionTitle: titles.get(sessionId) ?? '',
+      sessionTitle: isSubagent ? (labels.get(sessionId) ?? '') : (titles.get(sessionId) ?? ''),
+      parentTitle: isSubagent ? mainTitleOf(sessionId) : '',
+      isSubagent,
       cwd: session?.header?.cwd ?? '',
       detail: detailOf(kind, event),
       prefix: read('titlePrefix', ''),
@@ -272,5 +328,8 @@ export function apply(ctx, config) {
   return () => {
     disposeListener()
     titles.clear()
+    realTitles.clear()
+    labels.clear()
+    parents.clear()
   }
 }

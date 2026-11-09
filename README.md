@@ -2,7 +2,7 @@
 
 DSH 事件通知插件。当任务完成、任务中断、需要审批、需要回答问题时，把通知发到你配置的 **Gotify**、通用 **Webhook** 或 **ntfy**。
 
-通知正文只包含会话标题、事件细节与工作目录，**不包含会话正文**。发送失败只写日志，不会打断会话或工具执行。
+通知正文只包含会话标题、子代理标签、事件细节与工作目录，**不包含会话正文**。发送失败只写日志，不会打断会话或工具执行。
 
 ---
 
@@ -31,7 +31,7 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 dsh plugin --profile web add github:sorchk/dsh-event-notice
 
 # 固定到某个 tag
-dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.3
+dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.5
 
 # 固定到某个 commit
 dsh plugin --profile web add github:sorchk/dsh-event-notice#c30f562
@@ -64,7 +64,7 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 ```bash
 # 从 npm 安装（发布后可用，支持指定版本）
 plugin_manager install_bundle dsh-event-notice
-plugin_manager install_bundle dsh-event-notice@0.5.4
+plugin_manager install_bundle dsh-event-notice@0.5.5
 ```
 
 ### 从本地目录安装
@@ -169,7 +169,7 @@ ntfy 的五档优先级：
 | 地址 | 空 | 完整的 Webhook 地址 |
 | 请求方法 | `POST` | `POST` 或 `PUT` |
 | 额外请求头 | 空 | 每行一个 `名称: 值`，`#` 开头为注释 |
-| 请求体模板 | JSON 模板 | 占位符 `{{event}}` `{{title}}` `{{message}}` `{{sessionId}}` `{{sessionTitle}}` `{{cwd}}` `{{detail}}` `{{timestamp}}` |
+| 请求体模板 | JSON 模板 | 占位符 `{{event}}` `{{title}}` `{{message}}` `{{sessionId}}` `{{sessionTitle}}` `{{parentTitle}}` `{{cwd}}` `{{detail}}` `{{timestamp}}` |
 | 请求体类型 | `application/json` | `Content-Type` |
 
 请求体模板里的字符串值按 JSON 字面量转义后再填入，带引号或换行的正文也不会破坏请求体。
@@ -200,6 +200,19 @@ ntfy 的五档优先级：
 
 通知正文（`message`）依次是「会话标题」「事件细节」「工作目录」三行，会话标题取自会话自己的标题，拿不到时退回会话 ID。
 
+子代理会话另走一条：它的会话标题是从提示词里截出来的兜底标题（等于提示词片段），
+不能当标题用，因此正文第一行写成「子代理：<子代理标签>」，第二行写「主会话：<主会话标题>」：
+
+```text
+子代理：分析M01就业网站模块冲突
+主会话：就业管理实现冲突分析
+任务正常完成
+目录：/home/sorc/workspace/employment
+```
+
+子代理标签取自任务管理面板上那张卡片的名字；主会话标题沿父会话链往上找，
+只认标题生成服务或用户改名给出的正式标题，没有正式标题时就不写「主会话」这一行。
+
 ## 通知载荷
 
 Webhook 默认请求体：
@@ -211,9 +224,12 @@ Webhook 默认请求体：
   "message": "会话标题：收到\n任务正常完成\n目录：/home/sorc",
   "sessionId": "session-…",
   "sessionTitle": "收到",
+  "parentTitle": "",
   "timestamp": "2026-11-08T06:12:25.603Z"
 }
 ```
+
+子代理会话的载荷里 `sessionTitle` 是「子代理：<子代理标签>」，`parentTitle` 是主会话标题。
 
 Gotify 请求体：
 
@@ -307,7 +323,7 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.4.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.5.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。

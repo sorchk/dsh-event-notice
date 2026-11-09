@@ -178,6 +178,33 @@ test('没有会话标题时正文回落到会话 ID', () => {
   assert.equal(payload.sessionTitle, '')
 })
 
+test('子代理通知用子代理标签与主会话，不写「会话标题」', () => {
+  const payload = buildPayload({
+    kind: EVENT_TASK_COMPLETE,
+    sessionId: 'child-1',
+    sessionTitle: '分析M01就业网站模块冲突',
+    parentTitle: '就业管理实现冲突分析',
+    isSubagent: true,
+    detail: '任务正常完成',
+  })
+  assert.equal(payload.message, '子代理：分析M01就业网站模块冲突\n主会话：就业管理实现冲突分析\n任务正常完成')
+  assert.equal(payload.sessionTitle, '子代理：分析M01就业网站模块冲突')
+  assert.equal(payload.parentTitle, '就业管理实现冲突分析')
+  assert.equal(payload.isSubagent, true)
+})
+
+test('子代理没有标签时回落到会话 ID', () => {
+  const payload = buildPayload({
+    kind: EVENT_TASK_COMPLETE,
+    sessionId: 'child-1',
+    isSubagent: true,
+    detail: '任务正常完成',
+  })
+  assert.equal(payload.message, '子代理：child-1\n任务正常完成')
+  assert.equal(payload.sessionTitle, '')
+  assert.equal(payload.parentTitle, '')
+})
+
 test('模板渲染会转义引号与换行', () => {
   const payload = { message: '他说"你好"\n第二行', title: '标题', event: 'task-complete' }
   const rendered = renderTemplate('{"m":"{{message}}"}', payload)
