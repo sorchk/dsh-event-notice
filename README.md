@@ -24,7 +24,7 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 ```bash
 # 从 npm 安装（发布后可用，支持指定版本）
 plugin_manager install_bundle dsh-event-notice
-plugin_manager install_bundle dsh-event-notice@0.5.2
+plugin_manager install_bundle dsh-event-notice@0.5.3
 
 # 在 DSH 里安装本地 bundle
 plugin_manager install_bundle target=/绝对路径/dsh-event-notice
@@ -150,6 +150,10 @@ ntfy 的五档优先级：
 
 「发送测试通知」会对每个已启用且配置完整的通道各发一条测试消息，结果直接显示在按钮下方。
 
+这个按钮走的是插件挂在 DSH Web 上的本地路由 `POST /dsh-event-notice/test`，路由只接受同源请求：
+浏览器发来的 `Origin` 与 `Host` 必须完全一致，否则返回 403 `cross-origin request refused`。
+通过 `127.0.0.1`、局域网 IP、主机名、Tailscale 地址或反向代理域名访问 DSH Web 都不受影响。
+
 通知正文（`message`）依次是「会话标题」「事件细节」「工作目录」三行，会话标题取自会话自己的标题，拿不到时退回会话 ID。
 
 ## 通知载荷
@@ -210,7 +214,7 @@ lib/notify.js   纯逻辑：事件分类、通知决策、载荷构造、通道�
 lib/http.js     「发送测试通知」用的本地路由
 client.js       浏览器端：配置页
 locale/         en / zh 文案
-test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主端接线）
+test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主端接线，http.test.js 同源判定与路由）
 ```
 
 ## GitHub Actions
@@ -259,7 +263,7 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.2.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.3.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。
