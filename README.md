@@ -31,7 +31,7 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 dsh plugin --profile web add github:sorchk/dsh-event-notice
 
 # 固定到某个 tag
-dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.6
+dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.7
 
 # 固定到某个 commit
 dsh plugin --profile web add github:sorchk/dsh-event-notice#c30f562
@@ -186,6 +186,10 @@ Ntfy 的五档优先级：
 
 通知正文（`message`）依次是「会话标题」「事件细节」「工作目录」三行，会话标题取自会话自己的标题，拿不到时退回会话 ID。
 
+会话标题直接向 DSH 的标题服务查——那是会话状态的权威视图，插件重启、
+会话在插件加载之前就已经建好，都还能取到真正的标题，不会退化成 `session-…`
+这样的会话 ID。事件流只作兜底：标题事件只在标题生成时出现一次，错过就没了。
+
 子代理会话另走一条：它的会话标题是从提示词里截出来的兜底标题（等于提示词片段），
 不能当标题用，因此正文第一行写成「子代理：<子代理标签>」，第二行写「主会话：<主会话标题>」：
 
@@ -302,7 +306,7 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.6.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.7.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。

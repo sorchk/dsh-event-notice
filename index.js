@@ -114,6 +114,8 @@ export function apply(ctx, config) {
   const titles = new Map()
   /** 正式标题：来源是标题生成服务或用户改名，而不是提示词截断出来的兜底标题。 */
   const realTitles = new Map()
+  /** 标题来源：会话 ID → 标题的来源类别（provider / user / fallback）。 */
+  const titleKinds = new Map()
   /** 子代理标签：子会话 ID → 子代理的名字（任务管理面板上的卡片名）。 */
   const labels = new Map()
   /** 会话父子关系：子会话 ID → 父会话 ID；只有子代理会话才有父会话。 */
@@ -242,23 +244,110 @@ export function apply(ctx, config) {
   }
 
   /**
-   * 找出会话所属的主会话标题。
+   * 读会话投影的当前值。
    *
-   * 沿父会话链往上走：第一个没有父会话的祖先就是主会话。子代理的会话标题
-   * 是从提示词里截出来的兜底标题，不能拿来当主会话名，所以这里只认标题
-   * 生成服务或用户改出来的正式标题。
+   * 投影是会话状态的权威视图。事件缓存只在插件看见那条事件时才有值，
+   * 插件重启后就是空的；投影能补上这部分空白。
+   * @param {object} session 会话对象。
+   * @param {string} key 投影键，如 title、subagent。
+   * @returns {unknown} 视图值；没有这一项时返回 undefined。
+   */
+  const projectedValue = (session, key) => {
+    if (session === undefined || session === null) return undefined
+    const registry = ctx.get('sessionProjections')
+    if (registry === undefined) return undefined
+    try {
+      return registry.snapshot(session, [key])?.values?.[key]
+    } catch (error) {
+      logger.warn(`[dsh-event-notice] 读取会话投影 ${key} 失败：${String(error?.message ?? error)}`)
+      return undefined
+    }
+  }
+
+  /**
+   * 取会话的当前标题。
+   *
+   * 优先问标题服务：它同时给出标题的来源，能分清「标题生成服务或用户改的
+   * 正式标题」和「从第一条用户消息里截出来的兜底标题」。其次看投影视图，
+   * 最后才用事件缓存。
+   * @param {object} session 会话对象；拿不到时传 undefined。
    * @param {string} sessionId 会话 ID。
-   * @returns {string} 主会话标题；没有正式标题时返回空串。
+   * @returns {{title: string, kind: string}} 标题文本与来源（provider / user / fallback）。
+   */
+  const titleInfoOf = (session, sessionId) => {
+    const service = ctx.get('sessionTitle')
+    if (service !== undefined && session !== undefined) {
+      try {
+        const snapshot = service.get(session)
+        const title = typeof snapshot?.title === 'string' ? snapshot.title : ''
+        if (title !== '') return { title, kind: snapshot?.source?.kind ?? '' }
+      } catch (error) {
+        logger.warn(`[dsh-event-notice] 读取会话标题失败：${String(error?.message ?? error)}`)
+      }
+    }
+    const projected = projectedValue(session, 'title')
+    if (typeof projected === 'string' && projected !== '') {
+      return { title: projected, kind: titleKinds.get(sessionId) ?? '' }
+    }
+    return { title: titles.get(sessionId) ?? '', kind: titleKinds.get(sessionId) ?? '' }
+  }
+
+  /**
+   * 取子代理的标签：任务管理面板上卡片的名字。
+   * @param {object} session 会话对象。
+   * @param {string} sessionId 会话 ID。
+   * @returns {string} 标签文本；没有时返回空串。
+   */
+  const labelOf = (session, sessionId) => {
+    const identity = projectedValue(session, 'subagent')
+    const label = typeof identity?.label === 'string' ? identity.label : ''
+    if (label !== '') return label
+    return labels.get(sessionId) ?? ''
+  }
+
+  /**
+   * 取会话存储里的实时会话。
+   * @param {string} sessionId 会话 ID。
+   * @returns {object|undefined} 会话对象；取不到时返回 undefined。
+   */
+  const sessionOf = (sessionId) => {
+    const store = ctx.get('sessions')
+    if (store === undefined || typeof sessionId !== 'string' || sessionId === '') return undefined
+    try {
+      return store.get(sessionId)
+    } catch (error) {
+      logger.warn(`[dsh-event-notice] 读取会话 ${sessionId} 失败：${String(error?.message ?? error)}`)
+      return undefined
+    }
+  }
+
+  /**
+   * 找出会话所属的主会话，并取它的标题。
+   *
+   * 沿父会话链往上走：链顶（没有父会话的那一层）就是主会话。主会话的标题
+   * 要用正式标题——兜底标题是从第一条用户消息里截出来的，等于提示词片段。
+   * @param {string} sessionId 会话 ID。
+   * @returns {string} 主会话标题；没有时返回空串。
    */
   const mainTitleOf = (sessionId) => {
     const visited = new Set()
-    let current = sessionId
+    let currentId = sessionId
     for (;;) {
-      const parentId = parents.get(current)
-      if (parentId === undefined || visited.has(parentId)) return ''
-      visited.add(parentId)
-      current = parentId
-      if (!parents.has(current)) return realTitles.get(current) ?? ''
+      const current = sessionOf(currentId)
+      const parentId = current?.header?.parentSession ?? parents.get(currentId)
+      if (typeof parentId !== 'string' || parentId === '' || visited.has(parentId)) {
+        // 链顶就是主会话；会话本身没有父会话时没有主会话可言。
+        if (currentId === sessionId) return ''
+        const info = titleInfoOf(current, currentId)
+        if (info.kind === 'fallback') {
+          // 兜底标题是提示词片段：只有更早的正式标题能用，没有就不写这一行。
+          const real = realTitles.get(currentId)
+          return real !== undefined && real !== '' ? real : ''
+        }
+        return info.title
+      }
+      visited.add(currentId)
+      currentId = parentId
     }
   }
 
@@ -271,6 +360,7 @@ export function apply(ctx, config) {
       if (typeof title === 'string' && title !== '') {
         const source = event.data?.source?.kind ?? ''
         titles.set(sessionId, title)
+        titleKinds.set(sessionId, source)
         // 兜底标题是从第一条用户消息里截出来的，等于提示词片段，不算正式标题。
         if (source !== 'fallback') realTitles.set(sessionId, title)
       }
@@ -288,11 +378,25 @@ export function apply(ctx, config) {
     // 子代理会话的标题是从提示词里截出来的，不能当标题用：改用子代理标签，
     // 并补上它所属的主会话。
     const isSubagent = session?.header?.origin === 'subagent'
+    let sessionTitle = ''
+    let parentTitle = ''
+    if (isSubagent) {
+      sessionTitle = labelOf(session, sessionId)
+      parentTitle = mainTitleOf(sessionId)
+    } else {
+      const info = titleInfoOf(session, sessionId)
+      sessionTitle = info.title
+      // 兜底标题是提示词片段，能拿到正式标题时优先用正式的。
+      if (info.kind === 'fallback') {
+        const real = realTitles.get(sessionId)
+        if (real !== undefined && real !== '') sessionTitle = real
+      }
+    }
     const payload = buildPayload({
       kind,
       sessionId,
-      sessionTitle: isSubagent ? (labels.get(sessionId) ?? '') : (titles.get(sessionId) ?? ''),
-      parentTitle: isSubagent ? mainTitleOf(sessionId) : '',
+      sessionTitle,
+      parentTitle,
       isSubagent,
       cwd: session?.header?.cwd ?? '',
       detail: detailOf(kind, event),
@@ -329,6 +433,7 @@ export function apply(ctx, config) {
     disposeListener()
     titles.clear()
     realTitles.clear()
+    titleKinds.clear()
     labels.clear()
     parents.clear()
   }

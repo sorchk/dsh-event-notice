@@ -13,9 +13,10 @@ import { CHANNEL_NTFY } from '../lib/notify.js'
 /**
  * 造一个假的插件上下文。
  * @param {Record<string, unknown>} values 配置字段值。
+ * @param {Record<string, unknown>} services 假的 DSH 服务（sessionTitle / sessionProjections / sessions）。
  * @returns {{ctx: object, emit: Function, calls: object[]}} 上下文、事件触发器与请求记录。
  */
-function fakeHost(values) {
+function fakeHost(values, services = {}) {
   const calls = []
   const handlers = []
   const ctx = {
@@ -25,7 +26,7 @@ function fakeHost(values) {
       if (name === 'credentials') {
         return { resolve: async () => ({ value: 'tk_test', source: 'file' }) }
       }
-      return undefined
+      return services[name]
     },
     on(event, handler) {
       handlers.push({ event, handler })
@@ -210,5 +211,104 @@ test('主会话只有兜底标题时不写「主会话」这一行', async (t) =
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
   assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
+  assert.doesNotMatch(body.message, /主会话：/)
+})
+
+test('插件重启后仍从标题服务读到会话标题，不会退化成会话 ID', async (t) => {
+  // 会话在插件加载之前就已经建好，标题事件早就过去了：只能问标题服务。
+  const host = fakeHost(
+    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true },
+    {
+      sessionTitle: {
+        get() {
+          return { title: '就业管理实现冲突分析', source: { kind: 'provider' } }
+        },
+      },
+    },
+  )
+  t.after(() => host.restore())
+
+  await host.emit(session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.match(body.message, /会话标题：就业管理实现冲突分析/)
+  assert.doesNotMatch(body.message, /session-1/)
+})
+
+test('插件重启后子代理仍能拿到标签与主会话标题', async (t) => {
+  const { main, child } = sessionPair()
+  const host = fakeHost(
+    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true },
+    {
+      sessionTitle: {
+        get(target) {
+          if (target?.id === 'session-child') {
+            // 子代理的标题是从提示词里截出来的兜底标题。
+            return { title: '你是只读分析员，禁止修改任', source: { kind: 'fallback' } }
+          }
+          return { title: '就业管理实现冲突分析', source: { kind: 'provider' } }
+        },
+      },
+      sessionProjections: {
+        snapshot(target, keys) {
+          const values = {}
+          for (const key of keys) {
+            if (key === 'subagent' && target?.id === 'session-child') {
+              values.subagent = { mode: 'continuable', label: '分析M01就业网站模块冲突', seq: 1 }
+            }
+          }
+          return { asOfSeq: 1, values }
+        },
+      },
+      sessions: {
+        get(id) {
+          if (id === 'session-main') return main
+          if (id === 'session-child') return child
+          return undefined
+        },
+      },
+    },
+  )
+  t.after(() => host.restore())
+
+  await host.emit(child, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
+  assert.match(body.message, /主会话：就业管理实现冲突分析/)
+  assert.doesNotMatch(body.message, /你是只读分析员/)
+  assert.doesNotMatch(body.message, /session-child/)
+})
+
+test('主会话只有兜底标题时（有标题服务）不写「主会话」这一行', async (t) => {
+  const { main, child } = sessionPair()
+  const host = fakeHost(
+    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true },
+    {
+      sessionTitle: {
+        get(target) {
+          if (target?.id === 'session-child') {
+            return { title: '你是只读分析员，禁止修改任', source: { kind: 'fallback' } }
+          }
+          return { title: '你是只读分析员，禁止修改任', source: { kind: 'fallback' } }
+        },
+      },
+      sessions: {
+        get(id) {
+          if (id === 'session-main') return main
+          if (id === 'session-child') return child
+          return undefined
+        },
+      },
+    },
+  )
+  t.after(() => host.restore())
+
+  await host.emit(child, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
   assert.doesNotMatch(body.message, /主会话：/)
 })
