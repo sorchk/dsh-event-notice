@@ -59,20 +59,6 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 > 如果 pnpm 提示构建被阻止，按提示在 `~/.dsh/profiles/<profile>/pnpm-workspace.yaml` 的
 > `allowBuilds` 下加上对应的键（例如 `dsh-event-notice: true`），然后重跑同一条命令。
 
-### 从 npm 安装
-
-```bash
-# 从 npm 安装（发布后可用，支持指定版本）
-plugin_manager install_bundle dsh-event-notice
-plugin_manager install_bundle dsh-event-notice@0.5.5
-```
-
-### 从本地目录安装
-
-```bash
-# 在 DSH 里安装本地 bundle
-plugin_manager install_bundle target=/绝对路径/dsh-event-notice
-```
 
 安装后：
 
@@ -120,7 +106,7 @@ plugin_manager install_bundle target=/绝对路径/dsh-event-notice
 
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
-| 服务器地址 | `https://ntfy.sorc.fun:52` | 例如 `https://ntfy.example.com`；插件向根路径发布，主题放在请求体里，所以地址可以带路径前缀 |
+| 服务器地址 | 空 | 例如 `https://ntfy.example.com`；插件向根路径发布，主题放在请求体里，所以地址可以带路径前缀 |
 | 主题 | `dsh` | 通知发布到哪个主题 |
 | 凭据引用名 | `DSH_EVENT_NOTICE_NTFY_TOKEN` | 访问令牌在凭据存储里的键名 |
 | 访问令牌 | 空 | 写入凭据存储，不随设置明文落盘；留空表示保持原值。留空且服务器允许匿名发布时可以匿名发 |
