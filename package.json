@@ -1,6 +1,6 @@
 {
   "name": "dsh-event-notice",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "type": "module",
   "description": "DSH 事件通知插件：任务完成、子任务完成、任务中断、需要审批、需要回答问题时，通过 Gotify、Webhook 或 ntfy 发送通知。",
   "exports": {
@@ -58,7 +58,7 @@
       ]
     },
     "permissions": {
-      "summary": "监听 DSH 会话事件，在任务完成、子任务完成、任务中断、需要审批、需要回答问题时向用户配置的 Gotify、Webhook 或 ntfy 发送通知。插件只读取会话的标题、工作目录与结束原因，向外发出的请求仅限用户在配置页填写的 Gotify 服务器、Webhook 地址与 ntfy 服务器；Gotify 应用令牌与 ntfy 访问令牌保存在凭据存储中，不会随配置明文落盘。设置页与输入框里的铃铛按钮只读写插件自己的设置项。",
+      "summary": "监听 DSH 会话事件，在任务完成、子任务完成、任务中断、需要审批、需要回答问题时向用户配置的 Gotify、Webhook 或 ntfy 发送通知。插件只读取会话的标题、工作区名称与结束原因，向外发出的请求仅限用户在配置页填写的 Gotify 服务器、Webhook 地址与 ntfy 服务器；Gotify 应用令牌与 ntfy 访问令牌保存在凭据存储中，不会随配置明文落盘。设置页与输入框里的铃铛按钮只读写插件自己的设置项。",
       "commands": [
         "HTTP POST <gotifyUrl>/message（发送 Gotify 通知）",
         "HTTP POST|PUT <webhookUrl>（发送 Webhook 通知）",
@@ -74,7 +74,7 @@
       "failureBoundaries": [
         "通知发送失败只记录日志，不会中断会话或工具执行",
         "未配置通道地址或凭据时跳过该通道，其余通道照常发送",
-        "通知只包含会话标题、工作目录、结束原因与事件类型，不包含会话正文内容"
+        "通知只包含会话标题、工作区名称、结束原因与事件类型，不包含会话正文内容"
       ],
       "lifecycleEvidence": [
         "会话事件 turn/end 触发任务完成或任务中断通知",

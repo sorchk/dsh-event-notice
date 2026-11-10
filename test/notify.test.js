@@ -32,6 +32,7 @@ import {
   sendGotify,
   sendNtfy,
   sendWebhook,
+  workspaceNameFromPath,
 } from '../lib/notify.js'
 
 /**
@@ -146,7 +147,7 @@ test('会话级覆盖为关时覆盖全局默认的开启', () => {
   assert.equal(decideNotification(config, 's2', EVENT_TASK_COMPLETE), true)
 })
 
-test('缺少标题与目录时正文回落到事件名', () => {
+test('缺少标题与工作区时正文回落到事件名', () => {
   const payload = buildPayload({ kind: EVENT_APPROVAL_REQUIRED })
   assert.equal(payload.title, '需要审批')
   assert.equal(payload.message, '需要审批')
@@ -166,15 +167,28 @@ test('载荷包含标题、正文与会话信息', () => {
     kind: EVENT_TASK_COMPLETE,
     sessionId: 's1',
     sessionTitle: '写周报',
+    workspace: 'demo',
     cwd: '/tmp/work',
     detail: '任务正常完成',
     prefix: 'DSH',
   })
   assert.equal(payload.title, 'DSH · 任务完成')
   assert.match(payload.message, /写周报/)
-  assert.match(payload.message, /\/tmp\/work/)
+  assert.match(payload.message, /工作区：demo/)
+  assert.equal(payload.workspace, 'demo')
+  // 工作目录不进正文，只留在载荷里给自定义模板用。
+  assert.doesNotMatch(payload.message, /\/tmp\/work/)
+  assert.equal(payload.cwd, '/tmp/work')
   assert.equal(payload.sessionId, 's1')
   assert.equal(payload.event, EVENT_TASK_COMPLETE)
+})
+
+test('工作区名称取路径的最后一段', () => {
+  assert.equal(workspaceNameFromPath('/home/sorc/workspaces/dsh-event-notice'), 'dsh-event-notice')
+  assert.equal(workspaceNameFromPath('/home/sorc/workspaces/dsh-event-notice/'), 'dsh-event-notice')
+  assert.equal(workspaceNameFromPath('C:\\work\\demo'), 'demo')
+  assert.equal(workspaceNameFromPath(''), '')
+  assert.equal(workspaceNameFromPath(undefined), '')
 })
 
 test('通知内容里有「会话标题」这一项', () => {

@@ -4,9 +4,10 @@
  * 监听会话事件，在任务完成、任务中断、需要审批、需要回答问题时，
  * 把通知发到用户配置的 Gotify、通用 Webhook 或 ntfy。
  *
- * 通知内容只包含会话标题、子代理标签、工作目录、结束原因与事件类型，不包含会话正文。
+ * 通知内容只包含会话标题、子代理标签、工作区名称、结束原因与事件类型，不包含会话正文。
  * 发送失败只写日志，不会影响会话与工具执行。
  */
+import { realpathSync } from 'node:fs'
 import z from '@deepseek-ai/schemastery'
 import {
   CHANNEL_GOTIFY,
@@ -28,6 +29,7 @@ import {
   sendGotify,
   sendNtfy,
   sendWebhook,
+  workspaceNameFromPath,
 } from './lib/notify.js'
 import { registerRoutes } from './lib/http.js'
 
@@ -356,6 +358,52 @@ export function apply(ctx, config) {
     }
   }
 
+  /**
+   * 取路径的真实路径：工作区注册表里记的是 realpath 之后的规范路径。
+   * @param {string} path 原始路径。
+   * @returns {string} 规范路径；取不到时返回空串。
+   */
+  const canonicalPathOf = (path) => {
+    if (typeof path !== 'string' || path.trim() === '') return ''
+    try {
+      return realpathSync(path)
+    } catch {
+      return ''
+    }
+  }
+
+  /**
+   * 取会话所属工作区的名称。
+   *
+   * 优先问宿主的工作区注册表：它给的是工作区的显示名（默认是目录名，用户
+   * 可以改名）。注册表里还没有这条会话时，按目录对上工作区；都对不上就
+   * 退回工作目录的最后一段。
+   * @param {object} session 会话对象。
+   * @param {string} sessionId 会话 ID。
+   * @returns {string} 工作区名称；取不到时返回空串。
+   */
+  const workspaceNameOf = (session, sessionId) => {
+    const cwd = session?.header?.cwd ?? ''
+    const registry = ctx.get('workspaceRegistry')
+    if (registry !== undefined) {
+      try {
+        const workspaces = registry.list()
+        for (const workspace of workspaces) {
+          if (workspace.sessionIds.includes(sessionId)) return workspace.title
+        }
+        const canonical = canonicalPathOf(cwd)
+        if (canonical !== '') {
+          for (const workspace of workspaces) {
+            if (workspace.path === canonical) return workspace.title
+          }
+        }
+      } catch (error) {
+        logger.warn(`[dsh-event-notice] 读取工作区列表失败：${String(error?.message ?? error)}`)
+      }
+    }
+    return workspaceNameFromPath(cwd)
+  }
+
   /** 会话事件入口。 */
   const onSessionEvent = (session, event) => {
     const sessionId = session?.id ?? ''
@@ -404,6 +452,7 @@ export function apply(ctx, config) {
       parentTitle,
       isSubagent,
       cwd: session?.header?.cwd ?? '',
+      workspace: workspaceNameOf(session, sessionId),
       detail: detailOf(kind, event),
       prefix: read('titlePrefix', ''),
     })

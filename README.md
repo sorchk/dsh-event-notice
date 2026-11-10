@@ -2,7 +2,7 @@
 
 DSH 事件通知插件。当任务完成、子任务完成、任务中断、需要审批、需要回答问题时，把通知发到你配置的 **Ntfy** 、**Gotify**、或通用 **Webhook** 。
 
-通知正文只包含会话标题、子代理标签、事件细节与工作目录，**不包含会话正文**。发送失败只写日志，不会打断会话或工具执行。
+通知正文只包含会话标题、子代理标签、事件细节与工作区名称，**不包含会话正文**。发送失败只写日志，不会打断会话或工具执行。
 
 ---
 
@@ -34,7 +34,7 @@ DSH 事件通知插件。当任务完成、子任务完成、任务中断、需�
 dsh plugin --profile web add github:sorchk/dsh-event-notice
 
 # 固定到某个 tag
-dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.8
+dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.9
 
 # 固定到某个 commit
 dsh plugin --profile web add github:sorchk/dsh-event-notice#c30f562
@@ -159,7 +159,7 @@ Ntfy 的五档优先级：
 | 地址 | 空 | 完整的 Webhook 地址 |
 | 请求方法 | `POST` | `POST` 或 `PUT` |
 | 额外请求头 | 空 | 每行一个 `名称: 值`，`#` 开头为注释 |
-| 请求体模板 | JSON 模板 | 占位符 `{{event}}` `{{title}}` `{{message}}` `{{sessionId}}` `{{sessionTitle}}` `{{parentTitle}}` `{{cwd}}` `{{detail}}` `{{timestamp}}` |
+| 请求体模板 | JSON 模板 | 占位符 `{{event}}` `{{title}}` `{{message}}` `{{sessionId}}` `{{sessionTitle}}` `{{parentTitle}}` `{{workspace}}` `{{cwd}}` `{{detail}}` `{{timestamp}}` |
 | 请求体类型 | `application/json` | `Content-Type` |
 
 请求体模板里的字符串值按 JSON 字面量转义后再填入，带引号或换行的正文也不会破坏请求体。
@@ -188,7 +188,11 @@ Ntfy 的五档优先级：
 浏览器发来的 `Origin` 与 `Host` 必须完全一致，否则返回 403 `cross-origin request refused`。
 通过 `127.0.0.1`、局域网 IP、主机名、Tailscale 地址或反向代理域名访问 DSH Web 都不受影响。
 
-通知正文（`message`）依次是「会话标题」「事件细节」「工作目录」三行，会话标题取自会话自己的标题，拿不到时退回会话 ID。
+通知正文（`message`）依次是「会话标题」「事件细节」「工作区」三行，会话标题取自会话自己的标题，拿不到时退回会话 ID。
+
+「工作区」这一行写的是工作区的名称，不是工作目录的路径：名字取自 DSH 的工作区注册表，
+也就是侧边栏里那个工作区的显示名（默认是目录名，用户可以改名）。注册表里还没有这条会话时，
+退回会话工作目录的最后一段。
 
 会话标题直接向 DSH 的标题服务查——那是会话状态的权威视图，插件重启、
 会话在插件加载之前就已经建好，都还能取到真正的标题，不会退化成 `session-…`
@@ -208,7 +212,7 @@ Webhook 默认请求体：
 {
   "event": "task-complete",
   "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n目录：/home/user/workspace",
+  "message": "会话标题：收到\n任务正常完成\n工作区：dsh-event-notice",
   "sessionId": "session-…",
   "sessionTitle": "收到",
   "parentTitle": "",
@@ -219,12 +223,15 @@ Webhook 默认请求体：
 子代理会话的载荷里 `sessionTitle` 是「子代理：<子代理标签>」，`parentTitle` 是主会话标题；
 勾上「子任务完成」后，子代理正常完成时 `event` 为 `subtask-complete`、`title` 为 `DSH · 子任务完成`。
 
+载荷里还带 `workspace`（工作区名称）与 `cwd`（工作目录路径），两者都只进自定义模板的占位符，
+默认请求体里不带；正文里出现的是工作区名称，工作目录路径不出现在通知里。
+
 Gotify 请求体：
 
 ```json
 {
   "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n目录：/home/user/workspace",
+  "message": "会话标题：收到\n任务正常完成\n工作区：dsh-event-notice",
   "priority": 5
 }
 ```
@@ -235,7 +242,7 @@ Ntfy 请求体：
 {
   "topic": "dsh",
   "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n目录：/home/user/workspace",
+  "message": "会话标题：收到\n任务正常完成\n工作区：dsh-event-notice",
   "priority": 3
 }
 ```
@@ -311,7 +318,7 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.8.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.9.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。

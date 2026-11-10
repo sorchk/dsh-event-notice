@@ -370,3 +370,35 @@ test('子任务中断仍归为任务中断', async (t) => {
   const body = JSON.parse(host.calls[0].init.body)
   assert.equal(body.title, 'DSH · 任务中断')
 })
+
+test('通知内容里写工作区名称，不写工作目录', async (t) => {
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true })
+  t.after(() => host.restore())
+
+  await host.emit(session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.match(body.message, /工作区：demo/)
+  assert.doesNotMatch(body.message, /\/tmp\/demo/)
+})
+
+test('工作区名称取注册表里的显示名', async (t) => {
+  const host = fakeHost(
+    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true },
+    {
+      workspaceRegistry: {
+        list() {
+          return [{ id: 'w1', title: '演示项目', path: '/tmp/demo', sessionIds: ['session-1'] }]
+        },
+      },
+    },
+  )
+  t.after(() => host.restore())
+
+  await host.emit(session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.match(body.message, /工作区：演示项目/)
+})
