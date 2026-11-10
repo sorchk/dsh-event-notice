@@ -1,6 +1,6 @@
 # dsh-event-notice
 
-DSH 事件通知插件。当任务完成、任务中断、需要审批、需要回答问题时，把通知发到你配置的 **Gotify**、通用 **Webhook** 或 **ntfy**。
+DSH 事件通知插件。当任务完成、任务中断、需要审批、需要回答问题时，把通知发到你配置的 **Ntfy** 、**Gotify**、或通用 **Webhook** 。
 
 通知正文只包含会话标题、子代理标签、事件细节与工作目录，**不包含会话正文**。发送失败只写日志，不会打断会话或工具执行。
 
@@ -15,7 +15,7 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 | 需要审批 `approval-required` | 会话事件 `approval/asked` | 附上工具名与审批原因 |
 | 需要回答问题 `question-required` | 会话事件 `tool/call`，工具名为 `ask_user_question` | 助手正在等你回答 |
 
-三个通道可以同时启用：Gotify 走 `POST <服务器地址>/message?token=<应用令牌>`，Webhook 走自定义方法与自定义请求体，ntfy 走 JSON 发布接口（主题放在请求体里，所以标题里的中文不会坏掉请求头）。
+三个通道可以同时启用：Gotify 走 `POST <服务器地址>/message?token=<应用令牌>`，Webhook 走自定义方法与自定义请求体，Ntfy 走 JSON 发布接口（主题放在请求体里，所以标题里的中文不会坏掉请求头）。
 
 ## 安装
 
@@ -73,7 +73,7 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 
 在 Web GUI 的「设置 → 事件通知」或「插件 → 事件通知」里配置，所有字段都是即改即生效的。
 
-配置页沿用 DSH「通用设置」的排版：每一项是「左边标题加说明、右边控件」的一行，行间一条细线；三个通道用标签页组织，标签依次是 **ntfy、Gotify、Webhook**。
+配置页沿用 DSH「通用设置」的排版：每一项是「左边标题加说明、右边控件」的一行，行间一条细线；三个通道用标签页组织，标签依次是 **Ntfy、Gotify、Webhook**。
 
 ### 通用
 
@@ -81,15 +81,15 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 | --- | --- | --- |
 | 启用通知 | 开 | 总开关。关闭后不发任何通知 |
 | 所有会话默认通知 | **关** | 所有会话的默认行为。会话级覆盖优先于它 |
-| 默认通知方式 | Gotify + Webhook + ntfy | 勾选实际使用的通道 |
+| 默认通知方式 | Gotify + Webhook + Ntfy | 勾选实际使用的通道 |
 | 在设置页显示 | **开** | 关掉后设置弹窗左侧导航不再出现「事件通知」，只能从「插件 → 事件通知 → 配置」进入 |
 | 默认通知的事件 | 四项全开 | 勾选需要通知的事件 |
 | 通知标题前缀 | `DSH` | 通知标题形如 `DSH · 任务完成` |
 | 请求超时（毫秒） | `10000` | 单次请求超时 |
 
-### ntfy / Gotify / Webhook
+### Ntfy / Gotify / Webhook
 
-三个通道各占一个标签页，标签顺序是 ntfy、Gotify、Webhook。下面三节分别说明各通道的配置项。
+三个通道各占一个标签页，标签顺序是 Ntfy、Gotify、Webhook。下面三节分别说明各通道的配置项。
 
 ### Gotify
 
@@ -102,7 +102,7 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 
 令牌也可以用环境变量提供：凭据存储解析不到时不会回退到环境变量，需要环境变量时请把引用名设成同名变量并自行写入凭据存储。
 
-### ntfy
+### Ntfy
 
 | 配置项 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -110,9 +110,9 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 | 主题 | `dsh` | 通知发布到哪个主题 |
 | 凭据引用名 | `DSH_EVENT_NOTICE_NTFY_TOKEN` | 访问令牌在凭据存储里的键名 |
 | 访问令牌 | 空 | 写入凭据存储，不随设置明文落盘；留空表示保持原值。留空且服务器允许匿名发布时可以匿名发 |
-| 按事件设置优先级 | 见下表 | 每种事件单独设 ntfy 优先级（1–5） |
+| 按事件设置优先级 | 见下表 | 每种事件单独设 Ntfy 优先级（1–5） |
 
-ntfy 用 JSON 发布接口，请求体形如：
+Ntfy 用 JSON 发布接口，请求体形如：
 
 ```json
 {
@@ -125,9 +125,9 @@ ntfy 用 JSON 发布接口，请求体形如：
 
 ### 按事件设置优先级
 
-Gotify 与 ntfy 都支持「每种事件一个优先级」，互不影响。
+Gotify 与 Ntfy 都支持「每种事件一个优先级」，互不影响。
 
-ntfy 的五档优先级：
+Ntfy 的五档优先级：
 
 | 值 | 档位 | 效果 |
 | --- | --- | --- |
@@ -137,11 +137,11 @@ ntfy 的五档优先级：
 | 4 | high | 长震动 + 提示音，弹出通知 |
 | 5 | max | 很长的震动 + 弹出通知（urgent） |
 
-配置页里 ntfy 用下拉框给这五档命名，Gotify 用 0–10 的数字。某一事件没单独设置时，用通道缺省值（ntfy 为 3，Gotify 为 5）。
+配置页里 Ntfy 用下拉框给这五档命名，Gotify 用 0–10 的数字。某一事件没单独设置时，用通道缺省值（Ntfy 为 3，Gotify 为 5）。
 
 一个常见搭配：
 
-| 事件 | ntfy | Gotify |
+| 事件 | Ntfy | Gotify |
 | --- | --- | --- |
 | 任务完成 | 3 default | 5 |
 | 任务中断 | 4 high | 8 |
@@ -189,13 +189,6 @@ ntfy 的五档优先级：
 子代理会话另走一条：它的会话标题是从提示词里截出来的兜底标题（等于提示词片段），
 不能当标题用，因此正文第一行写成「子代理：<子代理标签>」，第二行写「主会话：<主会话标题>」：
 
-```text
-子代理：分析M01就业网站模块冲突
-主会话：就业管理实现冲突分析
-任务正常完成
-目录：/home/sorc/workspace/employment
-```
-
 子代理标签取自任务管理面板上那张卡片的名字；主会话标题沿父会话链往上找，
 只认标题生成服务或用户改名给出的正式标题，没有正式标题时就不写「主会话」这一行。
 
@@ -207,7 +200,7 @@ Webhook 默认请求体：
 {
   "event": "task-complete",
   "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n目录：/home/sorc",
+  "message": "会话标题：收到\n任务正常完成\n目录：/home/user/workspace",
   "sessionId": "session-…",
   "sessionTitle": "收到",
   "parentTitle": "",
@@ -222,18 +215,18 @@ Gotify 请求体：
 ```json
 {
   "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n目录：/home/sorc",
+  "message": "会话标题：收到\n任务正常完成\n目录：/home/user/workspace",
   "priority": 5
 }
 ```
 
-ntfy 请求体：
+Ntfy 请求体：
 
 ```json
 {
   "topic": "dsh",
   "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n目录：/home/sorc",
+  "message": "会话标题：收到\n任务正常完成\n目录：/home/user/workspace",
   "priority": 3
 }
 ```
@@ -241,8 +234,8 @@ ntfy 请求体：
 ## 权限与隐私
 
 - 只监听会话事件，不读取会话正文；
-- 只向用户在配置页填写的 Gotify 服务器、Webhook 地址与 ntfy 服务器发起请求；
-- Gotify 应用令牌与 ntfy 访问令牌都存在凭据存储（`~/.dsh/.credentials.yaml`），不写进设置文件。
+- 只向用户在配置页填写的 Gotify 服务器、Webhook 地址与 Ntfy 服务器发起请求；
+- Gotify 应用令牌与 Ntfy 访问令牌都存在凭据存储（`~/.dsh/.credentials.yaml`），不写进设置文件。
 
 ## 开发
 
