@@ -1,37 +1,40 @@
-name: 打包并发布到 npm
+name: 构建并发布到 npm
 
-# 仅手动触发：在 GitHub Actions 页面点击「Run workflow」才会执行，
-# 不做任何自动打包/自动发布（无 push / tag / schedule 触发器）。
+# 自动触发：推送 v* tag（如 v0.5.11）即自动构建并发布到 npm 官方仓库
+# （registry.npmjs.org）。日常提交不带 tag，不会触发发布。
+# 手动触发：可在 Actions 页面选分支跑一次演练（dry_run 默认开）。
+#
+# 本工作流不产出任何产物：不保留 artifact、不创建 GitHub Release、
+# 不把打包结果推回 GitHub 仓库，构建结果只流向 npm。
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
-      publish:
-        description: '是否真正发布到 npm（false = 只打包并产出 tarball 供下载）'
-        type: boolean
-        default: false
       dry_run:
         description: '发布前演练（npm publish --dry-run，不会真正上传）'
         type: boolean
-        default: false
+        default: true
       provenance:
         description: '启用 npm provenance 签名（需仓库为公开仓库）'
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
+  id-token: write # npm provenance / OIDC 受信任发布需要
 
 concurrency:
   group: npm-publish
   cancel-in-progress: false
 
 jobs:
-  # ---------------------------------------------------------------- 打包
-  build:
-    name: 打包
+  publish:
+    name: 构建并发布到 npm
     runs-on: ubuntu-latest
-    outputs:
-      tarball: ${{ steps.pack.outputs.tarball }}
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/dsh-event-notice
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
@@ -41,6 +44,13 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: 固定 npm 官方仓库
+        run: |
+          set -euo pipefail
+          # 显式指向 npm 官方仓库，避免继承宿主 .npmrc 里的镜像源
+          npm config set registry https://registry.npmjs.org
+          npm config get registry
 
       - name: 安装依赖
         run: |
@@ -58,7 +68,7 @@ jobs:
       - name: 运行单元测试
         run: npm test
 
-      - name: 校验 package.json
+      - name: 校验包信息
         run: |
           set -euo pipefail
           node -e "const p=require('./package.json');
@@ -72,109 +82,77 @@ jobs:
             exit 1
           fi
 
-      - name: 生成 tarball
-        id: pack
+      - name: 校验 tag 与版本号一致
+        # 仅 tag 触发时校验：tag 形如 v0.5.11，package.json 的 version 应为 0.5.11
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
           set -euo pipefail
-          mkdir -p dist
-          npm pack --pack-destination dist
-          echo "tarball=$(ls dist/*.tgz | head -n1)" >> "$GITHUB_OUTPUT"
-
-      - name: 上传 tarball
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-package
-          path: dist/*.tgz
-          if-no-files-found: error
-          # tarball 只是发布流程的中转站，保留 1 天足够；避免长期占用仓库存储配额
-          retention-days: 1
-
-      - name: 输出包内容清单
-        run: tar -tzf "${{ steps.pack.outputs.tarball }}"
-
-  # ---------------------------------------------------------------- 发布
-  publish:
-    name: 发布到 npm
-    needs: build
-    # 仅当手动触发时勾选了「是否真正发布到 npm」才执行
-    if: ${{ inputs.publish == true }}
-    runs-on: ubuntu-latest
-    environment:
-      name: npm
-      url: https://www.npmjs.com/package/dsh-event-notice
-    permissions:
-      contents: read
-      id-token: write # npm provenance 需要
-    steps:
-      - name: 准备 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 校验 npm token
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            echo "::error::未在仓库 Secrets 中配置 NPM_TOKEN，无法发布"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "${TAG_VERSION}" != "${PKG_VERSION}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} 与 package.json 版本 ${PKG_VERSION} 不一致，拒绝发布"
             exit 1
           fi
-          echo "NPM_TOKEN 已配置"
-
-      - name: 下载 tarball
-        uses: actions/download-artifact@v4
-        with:
-          name: npm-package
-          path: dist
+          echo "tag ${GITHUB_REF_NAME} 与 package.json 版本 ${PKG_VERSION} 一致"
 
       - name: 检查版本是否已发布
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
-          if npm view "dsh-event-notice@${VERSION}" version >/dev/null 2>&1; then
+          if npm view "dsh-event-notice@${VERSION}" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
             echo "::error::版本 ${VERSION} 已发布过，请先提升 package.json 版本号"
             exit 1
           fi
           echo "版本 ${VERSION} 尚未发布，可以继续"
 
-      - name: 发布
+      - name: 预览打包内容
+        # 只打印文件清单，不落地 tarball，也不保留任何产物
+        run: npm pack --dry-run --registry=https://registry.npmjs.org
+
+      - name: 确定认证方式
+        id: auth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NODE_AUTH_TOKEN}" ]; then
+            echo "mode=token" >> "$GITHUB_OUTPUT"
+            echo "使用仓库 Secret 中的 NPM_TOKEN 认证"
+          else
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+            echo "未配置 NPM_TOKEN，改用 OIDC 受信任发布（需在 npmjs.com 为本仓库开启 Trusted Publishing）"
+            # setup-node 写入的 .npmrc 带一行 _authToken=${NODE_AUTH_TOKEN}，
+            # token 为空时会变成空 token 行，反而盖掉 OIDC 认证，这里重写成只有 registry。
+            printf 'registry=https://registry.npmjs.org/\n' > ~/.npmrc
+          fi
+
+      - name: 发布到 npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
           PROVENANCE: ${{ inputs.provenance }}
+          MODE: ${{ steps.auth.outputs.mode }}
         run: |
           set -euo pipefail
-          TARBALL=$(ls dist/*.tgz 2>/dev/null | head -n1 || true)
-          if [ -z "${TARBALL}" ]; then
-            echo "::error::未找到待发布的 tarball（dist/*.tgz）"
-            exit 1
+          REGISTRY="https://registry.npmjs.org"
+          ARGS=(--access public --registry "${REGISTRY}")
+          if [ "${MODE}" = "oidc" ]; then
+            # OIDC 受信任发布需要 npm >= 11.5.1
+            npm install -g npm@latest
+            npm --version
           fi
-          # 必须以 ./ 开头：npm 会把 "dist/xxx.tgz" 当成 GitHub 简写（owner/repo），
-          # 转成 ssh://git@github.com/dist/xxx.tgz.git 去克隆，
-          # CI 无 SSH key 时必然报 "Permission denied (publickey)"（exit code 128）。
-          TARBALL="./${TARBALL}"
-          echo "待发布 tarball: ${TARBALL}"
           if [ "${DRY_RUN}" = "true" ]; then
-            npm publish "${TARBALL}" --dry-run --access public
+            # 演练模式不带 --provenance：演练不真正上传，也就不需要签名
+            npm publish --dry-run "${ARGS[@]}"
+            echo "::notice::dry_run=true：本次只做发布演练，未真正上传到 npm"
             exit 0
           fi
-          if [ "${PROVENANCE}" = "true" ]; then
-            npm publish "${TARBALL}" --access public --provenance
+          if [ "${PROVENANCE}" != "false" ]; then
+            # tag 触发时没有输入项（PROVENANCE 为空），同样默认开启 provenance 签名
+            npm publish "${ARGS[@]}" --provenance
           else
-            npm publish "${TARBALL}" --access public
+            npm publish "${ARGS[@]}"
           fi
-
-      - name: 演练结果提示
-        if: ${{ inputs.dry_run == true }}
-        run: |
-          echo "::notice::dry_run=true：本次只做发布演练，tarball 已通过 npm publish --dry-run 校验，未真正上传到 npm（因此跳过发布结果校验）"
 
       - name: 校验发布结果
         # dry_run 时并未真正发布到 npm，回查 registry 必然 404，跳过本步

@@ -279,49 +279,54 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 | 工作流 | 触发方式 | 做什么 |
 | --- | --- | --- |
 | [.github/workflows/ci.yml](./.github/workflows/ci.yml) | 每次 push、每个 PR | 语法检查 + 单元测试（`npm ci` → `node --check` → `npm test`） |
-| [.github/workflows/publish.yml](./.github/workflows/publish.yml) | 仅手动触发 | 打包（产出 tarball artifact），勾选 `publish` 时才真正发布到 npm |
+| [.github/workflows/publish.yml](./.github/workflows/publish.yml) | **推送 `v*` tag 时自动触发**，也可手动触发 | 构建后直接发布到 npm 官方仓库 |
 
-## 发布到 npm（GitHub Actions 手动触发）
+## 发布到 npm（推送 tag 自动发布）
 
-发布工作流**只在 GitHub Actions 页面点击「Run workflow」时执行**，没有任何自动触发器
-（不打 tag、不随 push 构建、不定时发布）。
+发布工作流在**推送 `v*` tag 时自动执行**，把该 tag 的代码构建后发布到 npm 官方仓库
+（`registry.npmjs.org`）。工作流**不保留任何产物**：不上传 artifact、不创建 GitHub Release、
+也不把打包结果推回 GitHub 仓库，构建结果只流向 npm。
 
 ### 前置配置（一次性）
 
 1. 在 npm 上确认包名 `dsh-event-notice` 可用（未被占用）。
-2. 在仓库 **Settings → Secrets and variables → Actions** 新建 secret：
+2. 二选一地配置发布凭据：
 
-   | Secret | 值 | 用途 |
+   | 方式 | 配置 | 说明 |
    | --- | --- | --- |
-   | `NPM_TOKEN` | npm 的 Automation Token（Classic Token 勾选 publish） | 发布权限 |
+   | npm token | 仓库 **Settings → Secrets and variables → Actions** 新建 secret `NPM_TOKEN`，值为 npm 的 Automation Token（Classic Token 勾选 publish） | 优先使用；没有配置时才回退到 OIDC |
+   | OIDC 受信任发布 | 在 npmjs.com 上为该仓库开启 **Trusted Publishing**（仓库名 `sorchk/dsh-event-notice`） | 不需要 token，工作流自动换取短期凭据；依赖 npm ≥ 11.5.1（工作流会自动升级 npm） |
 
 3. npm 账号需要开通 **Two-factor authentication**（npm 现在强制要求）。
 
 ### 执行方式
 
-在 GitHub 仓库页 → **Actions** → 左侧选择「打包并发布到 npm」→ 右侧 **Run workflow**，
-勾选输入项：
+提升版本号、打上同名 tag 并推送，发布就自动发生：
+
+```bash
+npm version patch --no-git-tag-version   # 或手工改 package.json 的 version
+git commit -am "版本：升级到 0.5.11"
+git tag v0.5.11
+git push origin main --tags
+```
+
+也可以在 GitHub 仓库页 → **Actions** → 左侧选择「构建并发布到 npm」→ 右侧 **Run workflow**
+手动跑一次，输入项：
 
 | 输入项 | 默认 | 说明 |
 | --- | --- | --- |
-| `publish` | `false` | 是否真正发布到 npm；`false` 时只打包并产出 `dsh-event-notice-<version>.tgz` 供下载 |
-| `dry_run` | `false` | 发布演练：`npm publish --dry-run`，不真正上传（需同时勾选 `publish`）；演练模式不会回查 npm 上的版本，因为演练不会真的发布 |
-| `provenance` | `false` | 启用 npm provenance 签名（需仓库为公开仓库，且工作流已申请 `id-token: write`） |
+| `dry_run` | `true` | 发布演练：`npm publish --dry-run`，不真正上传；演练模式不会回查 npm 上的版本，因为演练不会真的发布 |
+| `provenance` | `true` | 启用 npm provenance 签名（需仓库为公开仓库，工作流已申请 `id-token: write`） |
 
 ### 工作流做了什么
 
 | 阶段 | 步骤 |
 | --- | --- |
-| 打包 | 检出代码 → Node.js 20 → `npm ci` → `node --check` 语法检查 → `npm test` 单元测试 → 校验 `package.json`（无 `private`、有 `version`、包名为 `dsh-event-notice`）→ `npm pack` → 上传 tarball artifact（保留 1 天） |
-| 发布 | 仅当 `publish = true`：校验 `NPM_TOKEN` 存在 → 下载 tarball → 检查该版本是否已发布（已发布则报错退出）→ `npm publish --access public` → 回查 npm 上的版本与 tarball 地址（最多重试 20 次 × 15 秒；`dry_run` 模式跳过回查） |
+| 构建 | 检出代码 → Node.js 20 → 固定 npm 官方仓库 → `npm ci` → `node --check` 语法检查 → `npm test` 单元测试 → 校验 `package.json`（无 `private`、有 `version`、包名为 `dsh-event-notice`、协议为 MIT）与 `LICENSE` → 校验 tag 与 `package.json` 版本一致 → 检查该版本是否已发布（已发布则报错退出）→ `npm pack --dry-run` 预览打包内容（不落地产物） |
+| 发布 | 确定认证方式（有 `NPM_TOKEN` 用 token，没有则用 OIDC）→ `npm publish --access public --registry=https://registry.npmjs.org` → 回查 npm 上的版本与 tarball 地址（最多重试 20 次 × 15 秒；`dry_run` 模式跳过回查） |
 
-> 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
-> 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
-
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.10.tgz`）。
-> npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
-> 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
-> `Permission denied (publickey)`、`npm error code 128`。
+> 版本号来自 `package.json`，且必须与 tag 一致（`v0.5.11` ↔ `0.5.11`），否则工作流直接失败。
+> 重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，因此每次发布前请先提升 `package.json` 的版本号。
 
 发布后即可通过 `plugin_manager install_bundle dsh-event-notice` 安装；
 不等发布的话，直接从 GitHub 仓库装：`dsh plugin --profile web add github:sorchk/dsh-event-notice`。

@@ -2,6 +2,25 @@
 
 本项目遵循语义化版本。
 
+## 0.5.11
+
+### 修改
+
+- **发布工作流改为推送 tag 自动发布到 npm**：`.github/workflows/publish.yml` 的触发器
+  从「仅手动触发」改成「推送 `v*` tag 自动触发」+「可手动触发」。
+  推送 `v0.5.11` 这样的 tag 后，工作流自动完成构建（语法检查 → 单元测试 → 校验包信息 →
+  校验 tag 与版本号一致 → 检查该版本是否已发布）并把包发布到 npm 官方仓库
+  `registry.npmjs.org`，随后回查 npm 上的版本确认发布成功。
+- **不再保留任何产物**：去掉 `actions/upload-artifact` / `actions/download-artifact`，
+  构建与发布合并成同一个 job，打包只做 `npm pack --dry-run` 预览文件清单；
+  不创建 GitHub Release，也不把打包结果推回 GitHub 仓库，构建结果只流向 npm。
+- **认证方式更灵活**：优先用仓库 Secret `NPM_TOKEN`；没有配置时自动回退到 npm 的
+  OIDC 受信任发布（Trusted Publishing，自动升级到 npm ≥ 11.5.1），
+  两种方式都支持 npm provenance 签名。
+- **固定 npm 官方仓库**：所有 npm 命令显式使用 `registry.npmjs.org`，
+  不再受宿主机 `.npmrc` 里的镜像源影响。
+- 版本号升到 `0.5.11`。
+
 ## 0.5.10
 
 ### 修改
