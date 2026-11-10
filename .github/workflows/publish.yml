@@ -86,6 +86,8 @@ jobs:
           name: npm-package
           path: dist/*.tgz
           if-no-files-found: error
+          # tarball 只是发布流程的中转站，保留 1 天足够；避免长期占用仓库存储配额
+          retention-days: 1
 
       - name: 输出包内容清单
         run: tar -tzf "${{ steps.pack.outputs.tarball }}"

@@ -2,6 +2,16 @@
 
 本项目遵循语义化版本。
 
+## 0.5.10
+
+### 修改
+
+- **发布工作流的 tarball artifact 保留期改为 1 天**：`.github/workflows/publish.yml` 里
+  `actions/upload-artifact` 新增 `retention-days: 1`。tarball 只是打包阶段到发布阶段的中转站，
+  同一次工作流运行内就会被下载走，保留 1 天足够；此前未显式设置，保留期跟随仓库设置
+  （默认 90 天），长期占用仓库的 artifact 存储配额。
+- 版本号升到 `0.5.10`。
+
 ## 0.5.9
 
 ### 修改

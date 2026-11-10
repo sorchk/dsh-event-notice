@@ -34,7 +34,7 @@ DSH 事件通知插件。当任务完成、子任务完成、任务中断、需�
 dsh plugin --profile web add github:sorchk/dsh-event-notice
 
 # 固定到某个 tag
-dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.9
+dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.10
 
 # 固定到某个 commit
 dsh plugin --profile web add github:sorchk/dsh-event-notice#c30f562
@@ -312,13 +312,13 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 
 | 阶段 | 步骤 |
 | --- | --- |
-| 打包 | 检出代码 → Node.js 20 → `npm ci` → `node --check` 语法检查 → `npm test` 单元测试 → 校验 `package.json`（无 `private`、有 `version`、包名为 `dsh-event-notice`）→ `npm pack` → 上传 tarball artifact |
+| 打包 | 检出代码 → Node.js 20 → `npm ci` → `node --check` 语法检查 → `npm test` 单元测试 → 校验 `package.json`（无 `private`、有 `version`、包名为 `dsh-event-notice`）→ `npm pack` → 上传 tarball artifact（保留 1 天） |
 | 发布 | 仅当 `publish = true`：校验 `NPM_TOKEN` 存在 → 下载 tarball → 检查该版本是否已发布（已发布则报错退出）→ `npm publish --access public` → 回查 npm 上的版本与 tarball 地址（最多重试 20 次 × 15 秒；`dry_run` 模式跳过回查） |
 
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.9.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.10.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。
