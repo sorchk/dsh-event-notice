@@ -13,11 +13,12 @@ import {
   CHANNEL_NTFY,
   CHANNEL_WEBHOOK,
   CHANNELS,
+  DEFAULT_EVENTS,
   EVENT_APPROVAL_REQUIRED,
   EVENT_QUESTION_REQUIRED,
+  EVENT_SUBTASK_COMPLETE,
   EVENT_TASK_COMPLETE,
   EVENT_TASK_INTERRUPTED,
-  EVENTS,
   DEFAULT_WEBHOOK_BODY,
   buildPayload,
   classifyEvent,
@@ -62,13 +63,14 @@ export const Config = z.object({
     z.const(CHANNEL_WEBHOOK),
     z.const(CHANNEL_NTFY),
   ])).default([...CHANNELS]).volatile(),
-  /** 默认通知的事件。 */
+  /** 默认通知的事件；子任务完成默认不勾选。 */
   events: z.array(z.union([
     z.const(EVENT_TASK_COMPLETE),
+    z.const(EVENT_SUBTASK_COMPLETE),
     z.const(EVENT_TASK_INTERRUPTED),
     z.const(EVENT_APPROVAL_REQUIRED),
     z.const(EVENT_QUESTION_REQUIRED),
-  ])).default([...EVENTS]).volatile(),
+  ])).default([...DEFAULT_EVENTS]).volatile(),
   /** 通知标题前缀。 */
   titlePrefix: z.string().default('DSH').volatile(),
   /** 单次请求的超时时间（毫秒）。 */
@@ -220,6 +222,9 @@ export function apply(ctx, config) {
    * @returns {string} 细节文本。
    */
   const detailOf = (kind, event) => {
+    if (kind === EVENT_SUBTASK_COMPLETE) {
+      return '子任务正常完成'
+    }
     if (kind === EVENT_TASK_COMPLETE || kind === EVENT_TASK_INTERRUPTED) {
       return describeTurnEnd(event.data?.reason)
     }
@@ -372,12 +377,12 @@ export function apply(ctx, config) {
       if (typeof label === 'string' && label !== '') labels.set(sessionId, label)
       return
     }
-    const kind = classifyEvent(event)
+    // 子代理会话的标题是从提示词里截出来的，不能当标题用：改用子代理标签，
+    // 并补上它所属的主会话。子代理会话就是用户说的「子任务」。
+    const isSubagent = session?.header?.origin === 'subagent'
+    const kind = classifyEvent(event, { isSubagent })
     if (kind === undefined) return
     if (!decideNotification(config, sessionId, kind)) return
-    // 子代理会话的标题是从提示词里截出来的，不能当标题用：改用子代理标签，
-    // 并补上它所属的主会话。
-    const isSubagent = session?.header?.origin === 'subagent'
     let sessionTitle = ''
     let parentTitle = ''
     if (isSubagent) {

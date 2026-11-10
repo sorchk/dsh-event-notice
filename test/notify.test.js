@@ -10,11 +10,14 @@ import {
   CHANNEL_GOTIFY,
   CHANNEL_NTFY,
   CHANNEL_WEBHOOK,
+  DEFAULT_EVENTS,
   DEFAULT_WEBHOOK_BODY,
   EVENT_APPROVAL_REQUIRED,
   EVENT_QUESTION_REQUIRED,
+  EVENT_SUBTASK_COMPLETE,
   EVENT_TASK_COMPLETE,
   EVENT_TASK_INTERRUPTED,
+  EVENTS,
   GOTIFY_DEFAULT_PRIORITY,
   NTFY_DEFAULT_PRIORITY,
   buildPayload,
@@ -46,6 +49,23 @@ function volatileConfig(values) {
 
 test('turn/end 的 completed 归为任务完成', () => {
   assert.equal(classifyEvent({ type: 'turn/end', data: { reason: { kind: 'completed' } } }), EVENT_TASK_COMPLETE)
+})
+
+test('子代理会话的 completed 归为子任务完成', () => {
+  const event = { type: 'turn/end', data: { reason: { kind: 'completed' } } }
+  assert.equal(classifyEvent(event, { isSubagent: true }), EVENT_SUBTASK_COMPLETE)
+  assert.equal(classifyEvent(event, { isSubagent: false }), EVENT_TASK_COMPLETE)
+})
+
+test('子代理会话的中断仍归为任务中断', () => {
+  const event = { type: 'turn/end', data: { reason: { kind: 'aborted' } } }
+  assert.equal(classifyEvent(event, { isSubagent: true }), EVENT_TASK_INTERRUPTED)
+})
+
+test('子任务完成属于全部事件，但默认不勾选', () => {
+  assert.ok(EVENTS.includes(EVENT_SUBTASK_COMPLETE))
+  assert.ok(!DEFAULT_EVENTS.includes(EVENT_SUBTASK_COMPLETE))
+  assert.ok(DEFAULT_EVENTS.includes(EVENT_TASK_COMPLETE))
 })
 
 test('turn/end 的非完成原因归为任务中断', () => {

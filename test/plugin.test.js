@@ -8,7 +8,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { Config, apply } from '../index.js'
-import { CHANNEL_NTFY } from '../lib/notify.js'
+import { CHANNEL_NTFY, DEFAULT_EVENTS, EVENT_SUBTASK_COMPLETE } from '../lib/notify.js'
+
+/** 勾上全部事件（含子任务完成）的配置：子任务的通知默认不勾，这里显式打开。 */
+const WITH_SUBTASK = { events: [...DEFAULT_EVENTS, EVENT_SUBTASK_COMPLETE] }
 
 /**
  * 造一个假的插件上下文。
@@ -167,7 +170,7 @@ function sessionPair() {
 }
 
 test('子代理的通知用子代理标签与主会话标题，不显示提示词截出来的标题', async (t) => {
-  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true })
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true, ...WITH_SUBTASK })
   t.after(() => host.restore())
   const { main, child } = sessionPair()
 
@@ -194,7 +197,7 @@ test('子代理的通知用子代理标签与主会话标题，不显示提示�
 })
 
 test('主会话只有兜底标题时不写「主会话」这一行', async (t) => {
-  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true })
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true, ...WITH_SUBTASK })
   t.after(() => host.restore())
   const { main, child } = sessionPair()
 
@@ -239,7 +242,7 @@ test('插件重启后仍从标题服务读到会话标题，不会退化成会�
 test('插件重启后子代理仍能拿到标签与主会话标题', async (t) => {
   const { main, child } = sessionPair()
   const host = fakeHost(
-    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true },
+    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true, ...WITH_SUBTASK },
     {
       sessionTitle: {
         get(target) {
@@ -285,7 +288,7 @@ test('插件重启后子代理仍能拿到标签与主会话标题', async (t) =
 test('主会话只有兜底标题时（有标题服务）不写「主会话」这一行', async (t) => {
   const { main, child } = sessionPair()
   const host = fakeHost(
-    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true },
+    { ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true, ...WITH_SUBTASK },
     {
       sessionTitle: {
         get(target) {
@@ -311,4 +314,59 @@ test('主会话只有兜底标题时（有标题服务）不写「主会话」�
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
   assert.doesNotMatch(body.message, /主会话：/)
+})
+
+test('子任务完成默认不通知', async (t) => {
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true })
+  t.after(() => host.restore())
+  const { child } = sessionPair()
+
+  await host.emit(child, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 0)
+})
+
+test('勾上子任务完成后发子任务完成通知', async (t) => {
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true, ...WITH_SUBTASK })
+  t.after(() => host.restore())
+  const { main, child } = sessionPair()
+
+  await host.emit(main, {
+    type: 'session/title',
+    data: { title: '就业管理实现冲突分析', source: { kind: 'provider' } },
+  })
+  await host.emit(child, {
+    type: 'subagent/descriptor',
+    data: { mode: 'continuable', label: '分析M01就业网站模块冲突' },
+  })
+  await host.emit(child, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.equal(body.title, 'DSH · 子任务完成')
+  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
+  assert.match(body.message, /子任务正常完成/)
+})
+
+test('勾上子任务完成不影响主会话的任务完成通知', async (t) => {
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true, ...WITH_SUBTASK })
+  t.after(() => host.restore())
+
+  await host.emit(session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.equal(body.title, 'DSH · 任务完成')
+})
+
+test('子任务中断仍归为任务中断', async (t) => {
+  const host = fakeHost({ ntfyUrl: 'https://ntfy.example.com', ntfyTopic: 'dsh', defaultNotify: true, ...WITH_SUBTASK })
+  t.after(() => host.restore())
+  const { child } = sessionPair()
+
+  await host.emit(child, { type: 'turn/end', data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.equal(body.title, 'DSH · 任务中断')
 })

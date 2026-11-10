@@ -1,8 +1,8 @@
 {
   "name": "dsh-event-notice",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "type": "module",
-  "description": "DSH 事件通知插件：任务完成、任务中断、需要审批、需要回答问题时，通过 Gotify、Webhook 或 ntfy 发送通知。",
+  "description": "DSH 事件通知插件：任务完成、子任务完成、任务中断、需要审批、需要回答问题时，通过 Gotify、Webhook 或 ntfy 发送通知。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -58,7 +58,7 @@
       ]
     },
     "permissions": {
-      "summary": "监听 DSH 会话事件，在任务完成、任务中断、需要审批、需要回答问题时向用户配置的 Gotify、Webhook 或 ntfy 发送通知。插件只读取会话的标题、工作目录与结束原因，向外发出的请求仅限用户在配置页填写的 Gotify 服务器、Webhook 地址与 ntfy 服务器；Gotify 应用令牌与 ntfy 访问令牌保存在凭据存储中，不会随配置明文落盘。设置页与输入框里的铃铛按钮只读写插件自己的设置项。",
+      "summary": "监听 DSH 会话事件，在任务完成、子任务完成、任务中断、需要审批、需要回答问题时向用户配置的 Gotify、Webhook 或 ntfy 发送通知。插件只读取会话的标题、工作目录与结束原因，向外发出的请求仅限用户在配置页填写的 Gotify 服务器、Webhook 地址与 ntfy 服务器；Gotify 应用令牌与 ntfy 访问令牌保存在凭据存储中，不会随配置明文落盘。设置页与输入框里的铃铛按钮只读写插件自己的设置项。",
       "commands": [
         "HTTP POST <gotifyUrl>/message（发送 Gotify 通知）",
         "HTTP POST|PUT <webhookUrl>（发送 Webhook 通知）",
@@ -78,6 +78,7 @@
       ],
       "lifecycleEvidence": [
         "会话事件 turn/end 触发任务完成或任务中断通知",
+        "子代理会话的 turn/end 触发子任务完成通知（该事件默认不勾选，需在配置页打开）",
         "会话事件 approval/asked 触发需要审批通知",
         "会话事件 tool/call(ask_user_question) 触发需要回答问题通知",
         "配置页的「发送测试通知」按钮对已配置的通道各发出一条测试消息",

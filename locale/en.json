@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Event Notice",
-    "description": "Send a notification when a DSH task completes, is interrupted, needs an approval, or needs an answer to a question. Supports Gotify, generic webhooks and ntfy, each on its own tab. The page configures the default behaviour for every session, the default channels, the default events, each channel's server settings and a per-event priority."
+    "description": "Send a notification when a DSH task or subtask completes, is interrupted, needs an approval, or needs an answer to a question. Supports Gotify, generic webhooks and ntfy, each on its own tab. The page configures the default behaviour for every session, the default channels, the default events, each channel's server settings and a per-event priority."
   }
 }

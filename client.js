@@ -38,6 +38,7 @@ window.__ModuleLoader__.load({
     /** 事件选项；label 由字典提供，随界面语言切换。 */
     const EVENT_ITEMS = [
       { id: 'task-complete', labelKey: 'eventTaskComplete' },
+      { id: 'subtask-complete', labelKey: 'eventSubtaskComplete' },
       { id: 'task-interrupted', labelKey: 'eventTaskInterrupted' },
       { id: 'approval-required', labelKey: 'eventApprovalRequired' },
       { id: 'question-required', labelKey: 'eventQuestionRequired' },
@@ -72,8 +73,9 @@ window.__ModuleLoader__.load({
       showInSettings: 'Show in settings',
       showInSettingsHint: 'When off, the settings sidebar no longer lists Event notifications. Turn it back on from the plugin page.',
       events: 'Events to notify',
-      eventsHint: 'Which events trigger a notification by default.',
+      eventsHint: 'Which events trigger a notification by default. Subtask completion is off by default.',
       eventTaskComplete: 'Task completed',
+      eventSubtaskComplete: 'Subtask completed',
       eventTaskInterrupted: 'Task interrupted',
       eventApprovalRequired: 'Approval required',
       eventQuestionRequired: 'A question needs an answer',
@@ -142,6 +144,7 @@ window.__ModuleLoader__.load({
       summaryChannelsNone: 'none',
       summaryEventNames: {
         'task-complete': 'complete',
+        'subtask-complete': 'subtask',
         'task-interrupted': 'interrupted',
         'approval-required': 'approval',
         'question-required': 'question',
@@ -165,8 +168,9 @@ window.__ModuleLoader__.load({
       showInSettings: '在设置页显示',
       showInSettingsHint: '关闭后，设置页左侧导航不再显示「事件通知」。可以从「插件 → 事件通知 → 配置」重新打开。',
       events: '默认通知的事件',
-      eventsHint: '哪些事件会触发通知。',
+      eventsHint: '哪些事件会触发通知。子任务完成默认不勾选。',
       eventTaskComplete: '任务完成',
+      eventSubtaskComplete: '子任务完成',
       eventTaskInterrupted: '任务中断',
       eventApprovalRequired: '需要审批',
       eventQuestionRequired: '需要回答问题',
@@ -235,6 +239,7 @@ window.__ModuleLoader__.load({
       summaryChannelsNone: '无',
       summaryEventNames: {
         'task-complete': '完成',
+        'subtask-complete': '子任务',
         'task-interrupted': '中断',
         'approval-required': '审批',
         'question-required': '提问',

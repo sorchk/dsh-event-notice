@@ -1,6 +1,6 @@
 # dsh-event-notice
 
-DSH 事件通知插件。当任务完成、任务中断、需要审批、需要回答问题时，把通知发到你配置的 **Ntfy** 、**Gotify**、或通用 **Webhook** 。
+DSH 事件通知插件。当任务完成、子任务完成、任务中断、需要审批、需要回答问题时，把通知发到你配置的 **Ntfy** 、**Gotify**、或通用 **Webhook** 。
 
 通知正文只包含会话标题、子代理标签、事件细节与工作目录，**不包含会话正文**。发送失败只写日志，不会打断会话或工具执行。
 
@@ -10,10 +10,13 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 
 | 通知事件 | 触发来源 | 说明 |
 | --- | --- | --- |
-| 任务完成 `task-complete` | 会话事件 `turn/end`，结束原因 `completed` | 一轮任务正常跑完 |
-| 任务中断 `task-interrupted` | 会话事件 `turn/end`，结束原因为中止 / 阻塞 / 报错 / 达到 token 上限 | 附上具体原因，例如「任务被中止（用户中止）」 |
+| 任务完成 `task-complete` | 会话事件 `turn/end`，结束原因 `completed` | 主会话的一轮任务正常跑完 |
+| 子任务完成 `subtask-complete` | 子代理会话事件 `turn/end`，结束原因 `completed` | 子代理（子任务）正常跑完。**默认不勾选**，需要时在配置页打开 |
+| 任务中断 `task-interrupted` | 会话事件 `turn/end`，结束原因为中止 / 阻塞 / 报错 / 达到 token 上限 | 附上具体原因，例如「任务被中止（用户中止）」。子任务中断也算这一类 |
 | 需要审批 `approval-required` | 会话事件 `approval/asked` | 附上工具名与审批原因 |
 | 需要回答问题 `question-required` | 会话事件 `tool/call`，工具名为 `ask_user_question` | 助手正在等你回答 |
+
+「任务完成」只管主会话，「子任务完成」只管子代理会话（子任务 = 子代理会话），两者互斥：一条完成事件只归其中一类，不会重复通知。
 
 三个通道可以同时启用：Gotify 走 `POST <服务器地址>/message?token=<应用令牌>`，Webhook 走自定义方法与自定义请求体，Ntfy 走 JSON 发布接口（主题放在请求体里，所以标题里的中文不会坏掉请求头）。
 
@@ -31,7 +34,7 @@ DSH 事件通知插件。当任务完成、任务中断、需要审批、需要�
 dsh plugin --profile web add github:sorchk/dsh-event-notice
 
 # 固定到某个 tag
-dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.7
+dsh plugin --profile web add github:sorchk/dsh-event-notice#v0.5.8
 
 # 固定到某个 commit
 dsh plugin --profile web add github:sorchk/dsh-event-notice#c30f562
@@ -83,7 +86,7 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 | 所有会话默认通知 | **关** | 所有会话的默认行为。会话级覆盖优先于它 |
 | 默认通知方式 | Gotify + Webhook + Ntfy | 勾选实际使用的通道 |
 | 在设置页显示 | **开** | 关掉后设置弹窗左侧导航不再出现「事件通知」，只能从「插件 → 事件通知 → 配置」进入 |
-| 默认通知的事件 | 四项全开 | 勾选需要通知的事件 |
+| 默认通知的事件 | 除「子任务完成」外四项全开 | 勾选需要通知的事件。「子任务完成」默认不勾选 |
 | 通知标题前缀 | `DSH` | 通知标题形如 `DSH · 任务完成` |
 | 请求超时（毫秒） | `10000` | 单次请求超时 |
 
@@ -98,7 +101,7 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 | 服务器地址 | 空 | 例如 `https://gotify.example.com` |
 | 凭据引用名 | `DSH_EVENT_NOTICE_GOTIFY_TOKEN` | 应用令牌在凭据存储里的键名 |
 | 应用令牌 | 空 | 写入凭据存储，不随设置明文落盘；留空表示保持原值 |
-| 按事件设置优先级 | 四项都是 `5` | 每种事件单独设 Gotify 优先级（0–10），没写的用缺省值 5 |
+| 按事件设置优先级 | 五项都是 `5` | 每种事件单独设 Gotify 优先级（0–10），没写的用缺省值 5 |
 
 令牌也可以用环境变量提供：凭据存储解析不到时不会回退到环境变量，需要环境变量时请把引用名设成同名变量并自行写入凭据存储。
 
@@ -144,6 +147,7 @@ Ntfy 的五档优先级：
 | 事件 | Ntfy | Gotify |
 | --- | --- | --- |
 | 任务完成 | 3 default | 5 |
+| 子任务完成 | 3 default | 5 |
 | 任务中断 | 4 high | 8 |
 | 需要审批 | 5 max | 9 |
 | 需要回答问题 | 5 max | 9 |
@@ -212,7 +216,8 @@ Webhook 默认请求体：
 }
 ```
 
-子代理会话的载荷里 `sessionTitle` 是「子代理：<子代理标签>」，`parentTitle` 是主会话标题。
+子代理会话的载荷里 `sessionTitle` 是「子代理：<子代理标签>」，`parentTitle` 是主会话标题；
+勾上「子任务完成」后，子代理正常完成时 `event` 为 `subtask-complete`、`title` 为 `DSH · 子任务完成`。
 
 Gotify 请求体：
 
@@ -306,7 +311,7 @@ test/           单元测试（notify.test.js 纯逻辑，plugin.test.js 宿主�
 > 版本号来自 `package.json`。重复发布同一版本会被 npm 拒绝，工作流也会提前拦截，
 > 因此每次发布前请先提升 `package.json` 的版本号并打上同名 tag。
 
-> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.7.tgz`）。
+> **注意**：发布时传给 npm 的 tarball 路径必须以 `./` 开头（如 `./dist/dsh-event-notice-0.5.8.tgz`）。
 > npm 会把 `dist/xxx.tgz` 这种「斜杠分隔」参数当成 GitHub 简写（`owner/repo`），
 > 转成 `ssh://git@github.com/dist/xxx.tgz.git` 去克隆；CI 没有 SSH key 会报
 > `Permission denied (publickey)`、`npm error code 128`。
