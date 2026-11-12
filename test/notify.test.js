@@ -249,11 +249,25 @@ test('卡片标题按事件类型带对应颜色的圆点', () => {
     detail: '任务正常完成',
     prefix: 'DSH',
   })
-  assert.equal(payload.card.title, '🟢 DSH · 任务完成')
+  assert.equal(payload.card.title, '🟢 DSH * 任务完成')
   assert.equal(payload.card.emoji, '🟢')
   assert.equal(payload.card.color, 'green')
-  // 正文按 Markdown 引用块排版，客户端里渲染成一张带底色的卡片。
-  assert.equal(payload.card.message, '> **会话标题**：写周报\n>\n> **细节**：任务正常完成')
+  // 正文按 Markdown 引用块排版，客户端里渲染成一张带底色的卡片；各项之间用硬换行，不留空行。
+  assert.equal(payload.card.message, '> 标题：写周报  \n> 信息：任务正常完成')
+})
+
+test('卡片头把工作区名称写进括号里', () => {
+  const payload = buildPayload({
+    kind: EVENT_TASK_COMPLETE,
+    sessionId: 's1',
+    sessionTitle: '写周报',
+    detail: '任务正常完成',
+    workspace: 'dsh-event-notice',
+    prefix: 'DSH',
+  })
+  assert.equal(payload.card.title, '🟢 DSH * 任务完成 (dsh-event-notice)')
+  // 工作区只在卡片头出现一次，正文里不再重复。
+  assert.equal(payload.card.message, '> 标题：写周报  \n> 信息：任务正常完成')
 })
 
 test('每个事件都有自己的一套卡片头颜色', () => {
@@ -403,8 +417,8 @@ test('ntfy 卡片通知声明 Markdown 并带上卡片内容', async (t) => {
   await sendNtfy({ url: 'https://ntfy.example.com', topic: 'dsh', timeoutMs: 1000, card: true }, payload)
   const body = JSON.parse(calls[0].init.body)
   assert.equal(body.markdown, true)
-  assert.equal(body.title, '🟢 DSH · 任务完成')
-  assert.equal(body.message, '> **会话标题**：写周报\n>\n> **细节**：任务正常完成')
+  assert.equal(body.title, '🟢 DSH * 任务完成')
+  assert.equal(body.message, '> 标题：写周报  \n> 信息：任务正常完成')
 })
 
 test('Gotify 卡片通知声明 Markdown 的 extras', async (t) => {
@@ -424,7 +438,7 @@ test('Gotify 卡片通知声明 Markdown 的 extras', async (t) => {
   await sendGotify({ url: 'https://gotify.example.com', token: 'tok', timeoutMs: 1000, card: true }, payload)
   const body = JSON.parse(calls[0].init.body)
   assert.deepEqual(body.extras, { 'client::display': { contentType: 'text/markdown' } })
-  assert.equal(body.title, '🔴 DSH · 任务中断')
+  assert.equal(body.title, '🔴 DSH * 任务中断')
 })
 
 test('ntfy 没有令牌时匿名发布', async (t) => {
