@@ -2,6 +2,24 @@
 
 本项目遵循语义化版本。
 
+## 0.5.12
+
+### 新增
+
+- **Ntfy 与 Gotify 的通知改成卡片样式**：两个通道的正文按 Markdown 引用块排版，
+  客户端里渲染成一张带底色的卡片；标题前带一个彩色圆点作为卡片头，颜色按事件类型区分：
+  任务完成 🟢 绿、子任务完成 🔵 蓝、任务中断 🔴 红、需要审批 🟠 橙、需要回答问题 🟣 紫。
+  Gotify 通过 `extras.client::display.contentType = text/markdown` 让客户端按 Markdown 渲染，
+  Ntfy 通过请求体里的 `markdown: true` 打开 Markdown。
+- **配置页新增「卡片样式」开关**：默认开启，关掉后退回原来的纯文本通知
+  （请求体里不带 `markdown` 与 `extras`）。
+- **载荷新增 `cardTitle` 与 `cardMessage` 占位符**：Webhook 的自定义模板里可以取到
+  卡片标题与卡片正文。
+
+### 修改
+
+- 版本号升到 `0.5.12`。
+
 ## 0.5.11
 
 ### 修改

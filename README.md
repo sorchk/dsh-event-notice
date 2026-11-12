@@ -20,6 +20,8 @@ DSH 事件通知插件。当任务完成、子任务完成、任务中断、需�
 
 三个通道可以同时启用：Gotify 走 `POST <服务器地址>/message?token=<应用令牌>`，Webhook 走自定义方法与自定义请求体，Ntfy 走 JSON 发布接口（主题放在请求体里，所以标题里的中文不会坏掉请求头）。
 
+Ntfy 与 Gotify 的通知默认按**卡片样式**发送：标题前带一个按事件类型区分的彩色圆点作为卡片头，正文用 Markdown 引用块排版，客户端里渲染成一张带底色的卡片。可以在配置页关掉「卡片样式」，退回纯文本通知。
+
 ## 安装
 
 插件是一个 Cordis bundle，同时包含宿主端（`index.js`）与浏览器端（`client.js`）。
@@ -87,6 +89,7 @@ dsh plugin --profile web add git+ssh://git@github.com/sorchk/dsh-event-notice.gi
 | 默认通知方式 | Gotify + Webhook + Ntfy | 勾选实际使用的通道 |
 | 在设置页显示 | **开** | 关掉后设置弹窗左侧导航不再出现「事件通知」，只能从「插件 → 事件通知 → 配置」进入 |
 | 默认通知的事件 | 除「子任务完成」外四项全开 | 勾选需要通知的事件。「子任务完成」默认不勾选 |
+| 卡片样式 | **开** | Ntfy 与 Gotify 的通知按卡片发送：标题带彩色圆点，正文用 Markdown 排版。关掉后退回纯文本 |
 | 通知标题前缀 | `DSH` | 通知标题形如 `DSH · 任务完成` |
 | 请求超时（毫秒） | `10000` | 单次请求超时 |
 
@@ -159,7 +162,7 @@ Ntfy 的五档优先级：
 | 地址 | 空 | 完整的 Webhook 地址 |
 | 请求方法 | `POST` | `POST` 或 `PUT` |
 | 额外请求头 | 空 | 每行一个 `名称: 值`，`#` 开头为注释 |
-| 请求体模板 | JSON 模板 | 占位符 `{{event}}` `{{title}}` `{{message}}` `{{sessionId}}` `{{sessionTitle}}` `{{parentTitle}}` `{{workspace}}` `{{cwd}}` `{{detail}}` `{{timestamp}}` |
+| 请求体模板 | JSON 模板 | 占位符 `{{event}}` `{{title}}` `{{message}}` `{{cardTitle}}` `{{cardMessage}}` `{{sessionId}}` `{{sessionTitle}}` `{{parentTitle}}` `{{workspace}}` `{{cwd}}` `{{detail}}` `{{timestamp}}` |
 | 请求体类型 | `application/json` | `Content-Type` |
 
 请求体模板里的字符串值按 JSON 字面量转义后再填入，带引号或换行的正文也不会破坏请求体。
@@ -226,26 +229,55 @@ Webhook 默认请求体：
 载荷里还带 `workspace`（工作区名称）与 `cwd`（工作目录路径），两者都只进自定义模板的占位符，
 默认请求体里不带；正文里出现的是工作区名称，工作目录路径不出现在通知里。
 
-Gotify 请求体：
+Gotify 请求体（卡片样式）：
 
 ```json
 {
-  "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n工作区：dsh-event-notice",
-  "priority": 5
+  "title": "🟢 DSH · 任务完成",
+  "message": "> **会话标题**：收到\n>\n> **细节**：任务正常完成\n>\n> **工作区**：dsh-event-notice",
+  "priority": 5,
+  "extras": {
+    "client::display": {
+      "contentType": "text/markdown"
+    }
+  }
 }
 ```
 
-Ntfy 请求体：
+Ntfy 请求体（卡片样式）：
 
 ```json
 {
   "topic": "dsh",
-  "title": "DSH · 任务完成",
-  "message": "会话标题：收到\n任务正常完成\n工作区：dsh-event-notice",
-  "priority": 3
+  "title": "🟢 DSH · 任务完成",
+  "message": "> **会话标题**：收到\n>\n> **细节**：任务正常完成\n>\n> **工作区**：dsh-event-notice",
+  "priority": 3,
+  "markdown": true
 }
 ```
+
+### 卡片样式
+
+Ntfy 与 Gotify 的推送协议里都没有颜色字段，所以卡片头的颜色用一个彩色圆点表示，
+按事件类型区分：
+
+| 事件 | 卡片头 |
+| --- | --- |
+| 任务完成 | 🟢 绿 |
+| 子任务完成 | 🔵 蓝 |
+| 任务中断 | 🔴 红 |
+| 需要审批 | 🟠 橙 |
+| 需要回答问题 | 🟣 紫 |
+
+圆点写进通知标题（标题是纯文本，客户端原样显示），正文用 Markdown 的引用块排版，
+客户端把引用块渲染成一张带底色的卡片，因此整体看起来是一张「有颜色卡头」的卡片。
+
+Gotify 靠 `extras.client::display.contentType = text/markdown` 让客户端按 Markdown 渲染；
+Ntfy 靠请求体里的 `markdown: true`。两者都不支持 HTML，因此卡片里不写 HTML 标签。
+
+关掉配置页的「卡片样式」后，两个通道的请求体回到纯文本形式（不带 `markdown` 与 `extras`）。
+Webhook 不受影响，永远发纯文本正文；自定义模板里可以用 `{{cardTitle}}` 与 `{{cardMessage}}`
+占位符取到卡片标题与卡片正文。
 
 ## 权限与隐私
 

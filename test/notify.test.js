@@ -18,8 +18,10 @@ import {
   EVENT_TASK_COMPLETE,
   EVENT_TASK_INTERRUPTED,
   EVENTS,
+  EVENT_CARD_STYLES,
   GOTIFY_DEFAULT_PRIORITY,
   NTFY_DEFAULT_PRIORITY,
+  buildCard,
   buildPayload,
   classifyEvent,
   decideNotification,
@@ -239,6 +241,39 @@ test('子代理没有标签时回落到会话 ID', () => {
   assert.equal(payload.parentTitle, '')
 })
 
+test('卡片标题按事件类型带对应颜色的圆点', () => {
+  const payload = buildPayload({
+    kind: EVENT_TASK_COMPLETE,
+    sessionId: 's1',
+    sessionTitle: '写周报',
+    detail: '任务正常完成',
+    prefix: 'DSH',
+  })
+  assert.equal(payload.card.title, '🟢 DSH · 任务完成')
+  assert.equal(payload.card.emoji, '🟢')
+  assert.equal(payload.card.color, 'green')
+  // 正文按 Markdown 引用块排版，客户端里渲染成一张带底色的卡片。
+  assert.equal(payload.card.message, '> **会话标题**：写周报\n>\n> **细节**：任务正常完成')
+})
+
+test('每个事件都有自己的一套卡片头颜色', () => {
+  const emojis = Object.values(EVENT_CARD_STYLES).map((style) => style.emoji)
+  assert.equal(new Set(emojis).size, emojis.length)
+  assert.equal(EVENT_CARD_STYLES[EVENT_TASK_COMPLETE].emoji, '🟢')
+  assert.equal(EVENT_CARD_STYLES[EVENT_SUBTASK_COMPLETE].emoji, '🔵')
+  assert.equal(EVENT_CARD_STYLES[EVENT_TASK_INTERRUPTED].emoji, '🔴')
+  assert.equal(EVENT_CARD_STYLES[EVENT_APPROVAL_REQUIRED].emoji, '🟠')
+  assert.equal(EVENT_CARD_STYLES[EVENT_QUESTION_REQUIRED].emoji, '🟣')
+})
+
+test('没有对应样式的事件退回中性圆点', () => {
+  const card = buildCard({ event: 'unknown-event', title: '标题', message: '正文', fields: [] })
+  assert.equal(card.emoji, '⚪')
+  assert.equal(card.color, 'gray')
+  assert.equal(card.title, '⚪ 标题')
+  assert.equal(card.message, '> 正文')
+})
+
 test('模板渲染会转义引号与换行', () => {
   const payload = { message: '他说"你好"\n第二行', title: '标题', event: 'task-complete' }
   const rendered = renderTemplate('{"m":"{{message}}"}', payload)
@@ -349,6 +384,47 @@ test('ntfy 请求带主题、优先级与令牌', async (t) => {
     message: '正文',
     priority: 5,
   })
+})
+
+test('ntfy 卡片通知声明 Markdown 并带上卡片内容', async (t) => {
+  const calls = []
+  t.after(() => { globalThis.fetch = undefined })
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init })
+    return { ok: true, status: 200, text: async () => '' }
+  }
+  const payload = buildPayload({
+    kind: EVENT_TASK_COMPLETE,
+    sessionId: 's1',
+    sessionTitle: '写周报',
+    detail: '任务正常完成',
+    prefix: 'DSH',
+  })
+  await sendNtfy({ url: 'https://ntfy.example.com', topic: 'dsh', timeoutMs: 1000, card: true }, payload)
+  const body = JSON.parse(calls[0].init.body)
+  assert.equal(body.markdown, true)
+  assert.equal(body.title, '🟢 DSH · 任务完成')
+  assert.equal(body.message, '> **会话标题**：写周报\n>\n> **细节**：任务正常完成')
+})
+
+test('Gotify 卡片通知声明 Markdown 的 extras', async (t) => {
+  const calls = []
+  t.after(() => { globalThis.fetch = undefined })
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init })
+    return { ok: true, status: 200, text: async () => '' }
+  }
+  const payload = buildPayload({
+    kind: EVENT_TASK_INTERRUPTED,
+    sessionId: 's1',
+    sessionTitle: '写周报',
+    detail: '任务被中止（用户中止）',
+    prefix: 'DSH',
+  })
+  await sendGotify({ url: 'https://gotify.example.com', token: 'tok', timeoutMs: 1000, card: true }, payload)
+  const body = JSON.parse(calls[0].init.body)
+  assert.deepEqual(body.extras, { 'client::display': { contentType: 'text/markdown' } })
+  assert.equal(body.title, '🔴 DSH · 任务中断')
 })
 
 test('ntfy 没有令牌时匿名发布', async (t) => {

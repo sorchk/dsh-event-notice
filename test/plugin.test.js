@@ -92,9 +92,48 @@ test('turn/end 完成后按事件优先级发到 ntfy', async (t) => {
   const body = JSON.parse(call.init.body)
   assert.equal(body.topic, 'dsh')
   assert.equal(body.priority, 5)
+  // 卡片样式：标题带事件对应的彩色圆点，正文按 Markdown 引用块排版。
+  assert.equal(body.title, '🟢 DSH · 任务完成')
+  assert.equal(body.markdown, true)
+  assert.match(body.message, /\*\*会话标题\*\*：示例会话/)
+  assert.match(body.message, /\*\*细节\*\*：任务正常完成/)
+})
+
+test('关掉卡片样式后退回纯文本通知', async (t) => {
+  const host = fakeHost({
+    ntfyUrl: 'https://ntfy.example.com',
+    ntfyTopic: 'dsh',
+    defaultNotify: true,
+    cardStyle: false,
+  })
+  t.after(() => host.restore())
+
+  await host.emit(session, { type: 'session/title', data: { title: '示例会话' } })
+  await host.emit(session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
   assert.equal(body.title, 'DSH · 任务完成')
-  assert.match(body.message, /会话标题：示例会话/)
-  assert.match(body.message, /任务正常完成/)
+  assert.equal(body.markdown, undefined)
+  assert.equal(body.message, '会话标题：示例会话\n任务正常完成\n工作区：demo')
+})
+
+test('Gotify 的卡片通知带上 Markdown 的 extras', async (t) => {
+  const host = fakeHost({
+    channels: ['gotify'],
+    gotifyUrl: 'https://gotify.example.com',
+    defaultNotify: true,
+  })
+  t.after(() => host.restore())
+
+  await host.emit(session, { type: 'session/title', data: { title: '示例会话' } })
+  await host.emit(session, { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+
+  assert.equal(host.calls.length, 1)
+  const body = JSON.parse(host.calls[0].init.body)
+  assert.equal(body.title, '🟢 DSH · 任务完成')
+  assert.deepEqual(body.extras, { 'client::display': { contentType: 'text/markdown' } })
+  assert.match(body.message, /\*\*会话标题\*\*：示例会话/)
 })
 
 test('中断事件用自己那条优先级', async (t) => {
@@ -111,7 +150,7 @@ test('中断事件用自己那条优先级', async (t) => {
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
   assert.equal(body.priority, 4)
-  assert.equal(body.title, 'DSH · 任务中断')
+  assert.equal(body.title, '🔴 DSH · 任务中断')
   assert.match(body.message, /任务被中止（用户中止）/)
 })
 
@@ -191,8 +230,8 @@ test('子代理的通知用子代理标签与主会话标题，不显示提示�
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
-  assert.match(body.message, /主会话：就业管理实现冲突分析/)
+  assert.match(body.message, /\*\*子代理\*\*：分析M01就业网站模块冲突/)
+  assert.match(body.message, /\*\*主会话\*\*：就业管理实现冲突分析/)
   assert.doesNotMatch(body.message, /你是只读分析员/)
 })
 
@@ -213,8 +252,8 @@ test('主会话只有兜底标题时不写「主会话」这一行', async (t) =
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
-  assert.doesNotMatch(body.message, /主会话：/)
+  assert.match(body.message, /\*\*子代理\*\*：分析M01就业网站模块冲突/)
+  assert.doesNotMatch(body.message, /\*\*主会话\*\*/)
 })
 
 test('插件重启后仍从标题服务读到会话标题，不会退化成会话 ID', async (t) => {
@@ -235,7 +274,7 @@ test('插件重启后仍从标题服务读到会话标题，不会退化成会�
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.match(body.message, /会话标题：就业管理实现冲突分析/)
+  assert.match(body.message, /\*\*会话标题\*\*：就业管理实现冲突分析/)
   assert.doesNotMatch(body.message, /session-1/)
 })
 
@@ -279,8 +318,8 @@ test('插件重启后子代理仍能拿到标签与主会话标题', async (t) =
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
-  assert.match(body.message, /主会话：就业管理实现冲突分析/)
+  assert.match(body.message, /\*\*子代理\*\*：分析M01就业网站模块冲突/)
+  assert.match(body.message, /\*\*主会话\*\*：就业管理实现冲突分析/)
   assert.doesNotMatch(body.message, /你是只读分析员/)
   assert.doesNotMatch(body.message, /session-child/)
 })
@@ -313,7 +352,7 @@ test('主会话只有兜底标题时（有标题服务）不写「主会话」�
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.doesNotMatch(body.message, /主会话：/)
+  assert.doesNotMatch(body.message, /\*\*主会话\*\*/)
 })
 
 test('子任务完成默认不通知', async (t) => {
@@ -343,8 +382,8 @@ test('勾上子任务完成后发子任务完成通知', async (t) => {
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.equal(body.title, 'DSH · 子任务完成')
-  assert.match(body.message, /子代理：分析M01就业网站模块冲突/)
+  assert.equal(body.title, '🔵 DSH · 子任务完成')
+  assert.match(body.message, /\*\*子代理\*\*：分析M01就业网站模块冲突/)
   assert.match(body.message, /子任务正常完成/)
 })
 
@@ -356,7 +395,7 @@ test('勾上子任务完成不影响主会话的任务完成通知', async (t) =
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.equal(body.title, 'DSH · 任务完成')
+  assert.equal(body.title, '🟢 DSH · 任务完成')
 })
 
 test('子任务中断仍归为任务中断', async (t) => {
@@ -368,7 +407,7 @@ test('子任务中断仍归为任务中断', async (t) => {
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.equal(body.title, 'DSH · 任务中断')
+  assert.equal(body.title, '🔴 DSH · 任务中断')
 })
 
 test('通知内容里写工作区名称，不写工作目录', async (t) => {
@@ -379,7 +418,7 @@ test('通知内容里写工作区名称，不写工作目录', async (t) => {
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.match(body.message, /工作区：demo/)
+  assert.match(body.message, /\*\*工作区\*\*：demo/)
   assert.doesNotMatch(body.message, /\/tmp\/demo/)
 })
 
@@ -400,5 +439,5 @@ test('工作区名称取注册表里的显示名', async (t) => {
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.match(body.message, /工作区：演示项目/)
+  assert.match(body.message, /\*\*工作区\*\*：演示项目/)
 })

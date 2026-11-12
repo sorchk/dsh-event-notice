@@ -77,6 +77,8 @@ export const Config = z.object({
   titlePrefix: z.string().default('DSH').volatile(),
   /** 单次请求的超时时间（毫秒）。 */
   timeoutMs: z.number().step(1).min(1).max(600000).default(10000).volatile(),
+  /** ntfy 与 Gotify 是否使用卡片样式通知；关闭后回到纯文本。 */
+  cardStyle: z.boolean().default(true).volatile(),
   /** Gotify 服务器地址，例如 https://gotify.example.com。 */
   gotifyUrl: z.string().default('').volatile(),
   /** Gotify 应用令牌所在的凭据引用名。 */
@@ -154,6 +156,8 @@ export function apply(ctx, config) {
   const dispatch = async (payload) => {
     const channels = read('channels', [])
     const timeoutMs = read('timeoutMs', 10000)
+    // 卡片样式：ntfy 与 Gotify 都用它；关闭后退回纯文本通知。
+    const card = read('cardStyle', true) === true
     const results = []
     for (const channel of channels) {
       try {
@@ -170,6 +174,7 @@ export function apply(ctx, config) {
               gotifyPriorities: read('gotifyPriorities', {}),
             }),
             timeoutMs,
+            card,
           }, payload)
           results.push({ channel, ok: true })
           continue
@@ -187,6 +192,7 @@ export function apply(ctx, config) {
               ntfyPriorities: read('ntfyPriorities', {}),
             }),
             timeoutMs,
+            card,
           }, payload)
           results.push({ channel, ok: true })
           continue
