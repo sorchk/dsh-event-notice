@@ -233,7 +233,7 @@ Gotify 请求体（卡片样式）：
 
 ```json
 {
-  "title": "🟢 DSH * 任务完成 (dsh-event-notice)",
+  "title": "🟢 DSH · 任务完成 (dsh-event-notice)",
   "message": "> 标题：收到  \n> 信息：任务正常完成",
   "priority": 5,
   "extras": {
@@ -249,7 +249,7 @@ Ntfy 请求体（卡片样式）：
 ```json
 {
   "topic": "dsh",
-  "title": "🟢 DSH * 任务完成 (dsh-event-notice)",
+  "title": "🟢 DSH · 任务完成 (dsh-event-notice)",
   "message": "> 标题：收到  \n> 信息：任务正常完成",
   "priority": 3,
   "markdown": true
@@ -272,7 +272,7 @@ Ntfy 与 Gotify 的推送协议里都没有颜色字段，所以卡片头的颜�
 圆点写进通知标题（标题是纯文本，客户端原样显示），正文用 Markdown 的引用块排版，
 客户端把引用块渲染成一张带底色的卡片，因此整体看起来是一张「有颜色卡头」的卡片。
 
-卡片头把前缀、事件名与工作区挤在一行里：`🟢 DSH * 任务完成 (dsh-event-notice)`。
+卡片头把前缀、事件名与工作区挤在一行里：`🟢 DSH · 任务完成 (dsh-event-notice)`。
 正文只有两行——「标题」是会话标题，「信息」是事件细节；各项之间用 Markdown 的硬换行
 （行尾两个空格）分隔，渲染出来是一张紧凑的卡片，没有多余的空白行。工作区名称
 只出现在卡片头的括号里，正文不再重复。子代理会话的正文会多一行「主会话」。

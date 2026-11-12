@@ -93,7 +93,7 @@ test('turn/end 完成后按事件优先级发到 ntfy', async (t) => {
   assert.equal(body.topic, 'dsh')
   assert.equal(body.priority, 5)
   // 卡片样式：标题带事件对应的彩色圆点与工作区，正文按 Markdown 引用块紧凑排版。
-  assert.equal(body.title, '🟢 DSH * 任务完成 (demo)')
+  assert.equal(body.title, '🟢 DSH · 任务完成 (demo)')
   assert.equal(body.markdown, true)
   assert.match(body.message, /> 标题：示例会话/)
   assert.match(body.message, /> 信息：任务正常完成/)
@@ -133,7 +133,7 @@ test('Gotify 的卡片通知带上 Markdown 的 extras', async (t) => {
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.equal(body.title, '🟢 DSH * 任务完成 (demo)')
+  assert.equal(body.title, '🟢 DSH · 任务完成 (demo)')
   assert.deepEqual(body.extras, { 'client::display': { contentType: 'text/markdown' } })
   assert.match(body.message, /> 标题：示例会话/)
 })
@@ -152,7 +152,7 @@ test('中断事件用自己那条优先级', async (t) => {
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
   assert.equal(body.priority, 4)
-  assert.equal(body.title, '🔴 DSH * 任务中断 (demo)')
+  assert.equal(body.title, '🔴 DSH · 任务中断 (demo)')
   assert.match(body.message, /任务被中止（用户中止）/)
 })
 
@@ -384,7 +384,7 @@ test('勾上子任务完成后发子任务完成通知', async (t) => {
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.equal(body.title, '🔵 DSH * 子任务完成 (employment)')
+  assert.equal(body.title, '🔵 DSH · 子任务完成 (employment)')
   assert.match(body.message, /> 标题：分析M01就业网站模块冲突/)
   assert.match(body.message, /子任务正常完成/)
 })
@@ -397,7 +397,7 @@ test('勾上子任务完成不影响主会话的任务完成通知', async (t) =
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.equal(body.title, '🟢 DSH * 任务完成 (demo)')
+  assert.equal(body.title, '🟢 DSH · 任务完成 (demo)')
 })
 
 test('子任务中断仍归为任务中断', async (t) => {
@@ -409,7 +409,7 @@ test('子任务中断仍归为任务中断', async (t) => {
 
   assert.equal(host.calls.length, 1)
   const body = JSON.parse(host.calls[0].init.body)
-  assert.equal(body.title, '🔴 DSH * 任务中断 (employment)')
+  assert.equal(body.title, '🔴 DSH · 任务中断 (employment)')
 })
 
 test('通知内容里写工作区名称，不写工作目录', async (t) => {
